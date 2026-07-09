@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
       - name: Install dependencies
-        run: uv sync --extra dev --extra lsp
+        run: uv sync --extra dev --extra lsp --extra api
       - name: ruff check
         run: uv run ruff check .
       - name: ruff format --check
@@ -43,11 +43,13 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
       - name: Install dependencies
-        run: uv sync --extra dev --extra lsp
+        run: uv sync --extra dev --extra lsp --extra api
       - name: pytest
         run: uv run pytest -q
       - name: Smoke-test the CLI
         run: uv run nyx doctor
+      - name: Smoke-test the REST API app
+        run: uv run python -c "from nyxor.api.app import create_app; create_app()"
 
   vscode-extension:
     name: VS Code extension (compile)

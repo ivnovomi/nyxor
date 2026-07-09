@@ -55,6 +55,7 @@ nyx http inspect        # headers, redirects, cookies, security headers
 nyx inventory list      # discovered assets
 nyx script run/lint/new # NyxScript automation (see below)
 nyx report convert      # JSON -> Markdown/HTML
+nyx serve               # REST API — same scans, over HTTP (see below)
 nyx plugin list         # installed plugins
 nyx config show         # effective configuration
 ```
@@ -74,6 +75,7 @@ command, with zero configuration.
 ## Table of contents
 
 - [Security grade & badges](#security-grade--badges)
+- [The REST API](#the-rest-api)
 - [The dashboard](#the-dashboard)
 - [NyxScript](#nyxscript)
   - [Escape hatches: `python:` and `pip`](#escape-hatches-python-and-pip)
@@ -105,6 +107,34 @@ nyx watch example.com --interval 300
 reruns the audit every 5 minutes and stays quiet — a heartbeat line —
 until something actually changes: a new finding, a resolved one, or a
 grade transition, each timestamped and color-coded.
+
+## The REST API
+
+Same modules, fourth front-end: `nyx serve` runs a small FastAPI app over
+the identical `run_*` coroutines the CLI/TUI/NyxScript use — no scan logic
+is reimplemented for HTTP.
+
+```bash
+uv sync --extra api
+nyx serve --port 8842   # interactive docs at http://127.0.0.1:8842/docs
+```
+
+```bash
+curl http://127.0.0.1:8842/audit/example.com/score
+# {"domain":"example.com","grade":"A","points":94,"finding_counts":{"info":16,"low":0,"medium":1,"high":0,"critical":0}}
+```
+
+The fun one — a *live-generated* security badge, re-audited on every
+request, straight from a URL:
+
+```markdown
+![security](http://your-host:8842/badge/example.com.svg)
+```
+
+Other endpoints: `GET /health`, `GET /plugins`, `GET /audit/{domain}`,
+`GET /dns/{domain}`, `GET /tls/{target}`, `GET /http?url=...`,
+`GET /inventory`. All return the same `ModuleResult`/`Finding` JSON shapes
+the CLI's `--json` does, because they're the same Pydantic models.
 
 ## The dashboard
 
