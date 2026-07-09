@@ -19,11 +19,14 @@ import re
 from typing import ClassVar
 
 from rich.style import Style
+from textual import events
 from textual.widgets import OptionList, TextArea
 from textual.widgets.text_area import TextAreaTheme
 
+from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
 from nyxor.core.scripting.lexer import KEYWORDS, tokenize
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
+from nyxor.core.scripting.ui import UI_FUNCTIONS
 
 NYX_THEME = TextAreaTheme(
     name="nyxor",
@@ -31,6 +34,7 @@ NYX_THEME = TextAreaTheme(
         "keyword": Style(color="#b98cff", bold=True),
         "module": Style(color="#7ee7e1", bold=True),
         "string": Style(color="#f5d76e"),
+        "docstring": Style(color="#8fd6ff", italic=True),
         "comment": Style(color="#5b6a8c", italic=True),
         "number": Style(color="#ff9f43"),
         "boolean": Style(color="#ff9f43", bold=True),
@@ -38,11 +42,45 @@ NYX_THEME = TextAreaTheme(
     },
 )
 
-_CONTROL_KEYWORDS = {"if", "else", "end", "foreach", "in", "as", "to", "and", "or", "not"}
-_ACTION_KEYWORDS = {"set", "run", "save", "print", "sleep", "assert", "fail"}
+_CONTROL_KEYWORDS = {
+    "if",
+    "else",
+    "end",
+    "foreach",
+    "while",
+    "break",
+    "continue",
+    "in",
+    "as",
+    "to",
+    "and",
+    "or",
+    "not",
+    "return",
+}
+_ACTION_KEYWORDS = {
+    "set",
+    "run",
+    "save",
+    "print",
+    "sleep",
+    "assert",
+    "fail",
+    "func",
+    "import",
+}
 _BOOL_KEYWORDS = {"true", "false"}
 
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
+
+#: Don't suggest anything until the user's typed at least this many
+#: characters — completions firing after a single keystroke is what makes
+#: an editor feel like it's fighting you instead of helping.
+MIN_COMPLETION_PREFIX = 3
+
+#: Lines whose *entire* content, once complete, belongs one indent level
+#: back from wherever the cursor currently sits.
+_DEDENT_LINES = frozenset({"end", "else", "else:"})
 
 
 def _highlight_line(text: str) -> list[tuple[int, int | None, str]]:
@@ -52,6 +90,11 @@ def _highlight_line(text: str) -> list[tuple[int, int | None, str]]:
         tokens = tokenize(text)
     except Exception:
         return spans
+
+    # A line whose only content is a string literal is a docstring (see the
+    # grammar's `DocStmt`) — style it distinctly from an ordinary string.
+    real_tokens = [t for t in tokens if t.type not in ("NEWLINE", "EOF")]
+    is_docstring_line = len(real_tokens) == 1 and real_tokens[0].type == "STRING"
 
     for token in tokens:
         if token.type in ("NEWLINE", "EOF"):
@@ -65,7 +108,7 @@ def _highlight_line(text: str) -> list[tuple[int, int | None, str]]:
             while end < len(text) and text[end] != quote:
                 end += 2 if text[end] == "\\" else 1
             end = min(end + 1, len(text))
-            spans.append((start, end, "string"))
+            spans.append((start, end, "docstring" if is_docstring_line else "string"))
         elif token.type == "NUMBER":
             spans.append((start, start + len(token.value), "number"))
         elif token.type == "IDENT":
@@ -73,7 +116,11 @@ def _highlight_line(text: str) -> list[tuple[int, int | None, str]]:
                 spans.append((start, start + len(token.value), "boolean"))
             elif token.value in _ACTION_KEYWORDS or token.value in _CONTROL_KEYWORDS:
                 spans.append((start, start + len(token.value), "keyword"))
-            elif token.value in MODULE_RUNNERS:
+            elif (
+                token.value in MODULE_RUNNERS
+                or token.value in BUILTIN_FUNCTIONS
+                or (token.value.startswith("ui.") and token.value[3:] in UI_FUNCTIONS)
+            ):
                 spans.append((start, start + len(token.value), "module"))
         elif token.type in ("=", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/"):
             spans.append((start, start + len(token.value), "operator"))
@@ -130,12 +177,84 @@ class CompletionPopup(OptionList):
 class NyxScriptEditor(TextArea):
     """A `TextArea` pre-wired with NyxScript highlighting and completion."""
 
-    _COMPLETION_WORDS: ClassVar[list[str]] = sorted(KEYWORDS | set(MODULE_RUNNERS))
+    _COMPLETION_WORDS: ClassVar[list[str]] = sorted(
+        KEYWORDS
+        | set(MODULE_RUNNERS)
+        | set(BUILTIN_FUNCTIONS)
+        | {f"ui.{name}" for name in UI_FUNCTIONS}
+    )
 
     def on_mount(self) -> None:
         self.register_theme(NYX_THEME)
         self.theme = "nyxor"
+        self.show_line_numbers = True
         self._build_highlight_map()
+
+    def _indent_unit(self) -> str:
+        return "\t" if self.indent_type == "tabs" else " " * self.indent_width
+
+    def action_delete_left(self) -> None:
+        """Backspace inside leading whitespace deletes a whole indent level
+
+        (up to the previous tab stop) instead of one space at a time — the
+        indentation is spaces under the hood (`indent_type == "spaces"`),
+        but it should behave like it was a single tab character either way.
+        """
+        if self.read_only or not self.selection.is_empty or self.indent_type == "tabs":
+            super().action_delete_left()
+            return
+
+        row, col = self.cursor_location
+        line = self.document.get_line(row)
+        before_cursor = line[:col]
+
+        unit_width = self.indent_width
+        if col > 0 and before_cursor == " " * col and unit_width > 0:
+            remainder = col % unit_width
+            delete_count = min(remainder or unit_width, col)
+            self.delete((row, col - delete_count), (row, col))
+            return
+
+        super().action_delete_left()
+
+    async def _on_key(self, event: events.Key) -> None:
+        if not self.read_only and event.key == "enter":
+            event.stop()
+            event.prevent_default()
+            try:
+                self._auto_indent_newline()
+            except Exception:
+                self.insert("\n")  # never let a broken heuristic eat a keystroke
+            return
+        await super()._on_key(event)
+
+    def _auto_indent_newline(self) -> None:
+        """Continue the current line's indentation onto the new one — deeper
+
+        after a line ending in ``:``, one level back for a line that's just
+        ``end``/``else``/``else:`` (which also gets snapped back into place
+        first, in case it was still sitting at the body's indent level).
+        """
+        row, col = self.cursor_location
+        line = self.document.get_line(row)
+        indent_len = len(line) - len(line.lstrip(" \t"))
+        indent = line[:indent_len]
+        stripped = line.strip()
+        unit = self._indent_unit()
+
+        if stripped in _DEDENT_LINES and len(indent) >= len(unit):
+            target_indent = indent[: -len(unit)]
+            if target_indent != indent:
+                new_line = target_indent + line[indent_len:]
+                self.replace(new_line, (row, 0), (row, len(line)))
+                col = max(col - (len(indent) - len(target_indent)), len(target_indent))
+                indent = target_indent
+                line = new_line
+
+        before_cursor = line[:col].strip()
+        next_indent = indent + unit if before_cursor.endswith(":") else indent
+        self.move_cursor((row, col))
+        self.insert("\n" + next_indent)
 
     def _build_highlight_map(self) -> None:
         """Populate ``self._highlights`` from our own lexer (no tree-sitter)."""
@@ -175,7 +294,11 @@ class NyxScriptEditor(TextArea):
         prefix = prefix_match.group(0) if prefix_match else ""
 
         # Don't suggest mid-word (e.g. cursor inside "fore|ach") — only at the tail.
-        if not prefix or (col < len(line) and re.match(r"[A-Za-z0-9_.]", line[col])):
+        # And don't suggest at all until there's enough typed to actually narrow
+        # things down; firing after one keystroke is just noise.
+        if len(prefix) < MIN_COMPLETION_PREFIX or (
+            col < len(line) and re.match(r"[A-Za-z0-9_.]", line[col])
+        ):
             return "", []
 
         candidates = sorted(self._COMPLETION_WORDS + sorted(self._known_variables()))
