@@ -49,6 +49,7 @@ lsp = [
 api = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.scripts]
