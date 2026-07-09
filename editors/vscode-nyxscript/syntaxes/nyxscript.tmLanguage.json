@@ -1,0 +1,94 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "NyxScript",
+  "scopeName": "source.nyxscript",
+  "patterns": [
+    { "include": "#python-block" },
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#booleans" },
+    { "include": "#keywords" },
+    { "include": "#modules" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "python-block": {
+      "begin": "^(\\s*)(python)(\\s*:\\s*)$",
+      "beginCaptures": {
+        "2": { "name": "keyword.control.nyxscript" }
+      },
+      "end": "^(\\s*)(end)(\\s*)$",
+      "endCaptures": {
+        "2": { "name": "keyword.control.nyxscript" }
+      },
+      "contentName": "meta.embedded.block.python",
+      "patterns": [
+        { "include": "source.python" }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "match": "#.*$",
+          "name": "comment.line.number-sign.nyxscript"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.nyxscript",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            { "name": "constant.character.escape.nyxscript", "match": "\\\\." },
+            { "match": "\\{\\{|\\}\\}", "name": "constant.character.escape.nyxscript" },
+            {
+              "name": "meta.interpolation.nyxscript",
+              "begin": "\\{",
+              "beginCaptures": { "0": { "name": "punctuation.definition.interpolation.begin.nyxscript" } },
+              "end": "\\}",
+              "endCaptures": { "0": { "name": "punctuation.definition.interpolation.end.nyxscript" } },
+              "patterns": [
+                { "include": "#numbers" },
+                { "include": "#booleans" },
+                { "include": "#keywords" },
+                { "include": "#operators" },
+                { "match": "[A-Za-z_][A-Za-z0-9_]*", "name": "variable.other.nyxscript" }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.nyxscript",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            { "name": "constant.character.escape.nyxscript", "match": "\\\\." }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "match": "\\b\\d+(\\.\\d+)?\\b",
+      "name": "constant.numeric.nyxscript"
+    },
+    "booleans": {
+      "match": "\\b(true|false)\\b",
+      "name": "constant.language.boolean.nyxscript"
+    },
+    "keywords": {
+      "match": "\\b(set|if|else|end|foreach|in|run|as|to|save|print|sleep|assert|fail|pip|and|or|not)\\b",
+      "name": "keyword.control.nyxscript"
+    },
+    "modules": {
+      "match": "\\b(audit|dns|tls|http|network\\.discover|network\\.scan)\\b",
+      "name": "support.function.nyxscript"
+    },
+    "operators": {
+      "match": "(==|!=|<=|>=|<|>|=|\\+|-|\\*|/)",
+      "name": "keyword.operator.nyxscript"
+    }
+  }
+}

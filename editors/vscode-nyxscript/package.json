@@ -1,0 +1,83 @@
+{
+  "name": "nyxscript",
+  "displayName": "NyxScript",
+  "description": "Syntax highlighting, linting, and completion for NyxScript (.nyx) — NYXOR's automation language.",
+  "version": "0.1.0",
+  "publisher": "nyxor",
+  "license": "MIT",
+  "icon": "icons/nyxscript.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:nyxscript"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "nyxscript",
+        "aliases": [
+          "NyxScript",
+          "nyxscript"
+        ],
+        "extensions": [
+          ".nyx"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/nyxscript.svg",
+          "dark": "./icons/nyxscript.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "nyxscript",
+        "scopeName": "source.nyxscript",
+        "path": "./syntaxes/nyxscript.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.python": "python"
+        }
+      }
+    ],
+    "configuration": {
+      "title": "NyxScript",
+      "properties": {
+        "nyxscript.serverCommand": {
+          "type": "string",
+          "default": "nyx",
+          "description": "Command used to launch the NyxScript language server. Use a full path, or e.g. \"uv\" with serverArgs [\"run\", \"nyx\", \"script\", \"lsp\"] if `nyx` isn't on PATH."
+        },
+        "nyxscript.serverArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "script",
+            "lsp"
+          ],
+          "description": "Arguments passed to nyxscript.serverCommand to start the language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}

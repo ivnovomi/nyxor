@@ -1,0 +1,98 @@
+"""Turns a set of findings into a single, at-a-glance security grade.
+
+Not a rigorous scoring methodology — a deliberately simple, transparent one
+in the spirit of SSL Labs' letter grades: start at 100 points, subtract a
+fixed penalty per finding by severity, floor at 0, map to a letter. Good
+enough for "did this get better or worse since last time", which is the
+job it's actually used for (`nyx audit`, `nyx watch`).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from nyxor.core.models import ModuleResult, Severity
+
+_PENALTY: dict[Severity, int] = {
+    Severity.CRITICAL: 30,
+    Severity.HIGH: 15,
+    Severity.MEDIUM: 6,
+    Severity.LOW: 2,
+    Severity.INFO: 0,
+}
+
+_GRADE_THRESHOLDS: tuple[tuple[int, str], ...] = (
+    (97, "A+"),
+    (93, "A"),
+    (90, "A-"),
+    (87, "B+"),
+    (80, "B"),
+    (70, "C"),
+    (60, "D"),
+    (0, "F"),
+)
+
+GRADE_COLOR: dict[str, str] = {
+    "A+": "#2ecc71",
+    "A": "#2ecc71",
+    "A-": "#7ee7e1",
+    "B+": "#7ee7e1",
+    "B": "#f5d76e",
+    "C": "#ff9f43",
+    "D": "#ff6b4a",
+    "F": "#ff4d6d",
+}
+
+
+@dataclass(frozen=True)
+class SecurityScore:
+    points: int
+    grade: str
+    finding_counts: dict[Severity, int] = field(default_factory=dict)
+
+    @property
+    def color(self) -> str:
+        return GRADE_COLOR[self.grade]
+
+
+def score_results(results: list[ModuleResult]) -> SecurityScore:
+    """Compute a letter grade from every finding across ``results``."""
+    counts: dict[Severity, int] = dict.fromkeys(Severity, 0)
+    points = 100
+    for result in results:
+        for finding in result.findings:
+            counts[finding.severity] += 1
+            points -= _PENALTY[finding.severity]
+    points = max(points, 0)
+    grade = next(letter for threshold, letter in _GRADE_THRESHOLDS if points >= threshold)
+    return SecurityScore(points=points, grade=grade, finding_counts=counts)
+
+
+def render_badge(score: SecurityScore, *, label: str = "security") -> str:
+    """Render a shields.io-style flat SVG badge for ``score`` (e.g. "security: A+")."""
+    value = score.grade
+    label_width = int(len(label) * 6.5) + 20
+    value_width = int(len(value) * 7.5) + 20
+    total_width = label_width + value_width
+    color = score.color
+    label_x = label_width / 2
+    value_x = label_width + value_width / 2
+
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{total_width}" height="20" \
+role="img" aria-label="{label}: {value}">
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r"><rect width="{total_width}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="{label_width}" height="20" fill="#2b2f3a"/>
+    <rect x="{label_width}" width="{value_width}" height="20" fill="{color}"/>
+    <rect width="{total_width}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,sans-serif" font-size="11">
+    <text x="{label_x}" y="14">{label}</text>
+    <text x="{value_x}" y="14">{value}</text>
+  </g>
+</svg>
+"""

@@ -1,0 +1,100 @@
+[project]
+name = "nyxor"
+version = "0.1.0"
+description = "NYXOR — a modular, cross-platform security assessment and infrastructure auditing toolkit."
+readme = "README.md"
+authors = [
+    { name = "ivnovomi", email = "idimnovdie1602@protonmail.com" }
+]
+requires-python = ">=3.13"
+license = "MIT"
+keywords = ["security", "audit", "network", "dns", "tls", "http", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+
+dependencies = [
+    "typer>=0.15.1",
+    "rich>=13.9.4",
+    "pydantic>=2.10.3",
+    "pydantic-settings>=2.7.0",
+    "structlog>=24.4.0",
+    "platformdirs>=4.3.6",
+    "tomli-w>=1.1.0",
+    "dnspython>=2.7.0",
+    "httpx>=0.28.1",
+    "cryptography>=44.0.0",
+    "jinja2>=3.1.4",
+    "pyyaml>=6.0.2",
+    "textual>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.0",
+    "pytest-cov>=6.0.0",
+    "mypy>=1.14.0",
+    "ruff>=0.8.4",
+    "types-pyyaml>=6.0.12",
+]
+lsp = [
+    "pygls>=1.3.0",
+]
+
+[project.scripts]
+nyxor = "nyxor.core.cli:main"
+nyx = "nyxor.core.cli:main"
+
+# Built-in plugins register through the same entry-point group that third
+# party plugins use. The Core does not know about any plugin by name — it
+# only knows how to discover this group. See docs/plugin-development.md.
+[project.entry-points."nyxor.plugins"]
+system = "nyxor.plugins.system.plugin:PLUGIN"
+config = "nyxor.plugins.config_cmd.plugin:PLUGIN"
+plugin = "nyxor.plugins.plugin_cmd.plugin:PLUGIN"
+network = "nyxor.plugins.network.plugin:PLUGIN"
+dns = "nyxor.plugins.dns_.plugin:PLUGIN"
+tls = "nyxor.plugins.tls_.plugin:PLUGIN"
+http = "nyxor.plugins.http_.plugin:PLUGIN"
+inventory = "nyxor.plugins.inventory.plugin:PLUGIN"
+report = "nyxor.plugins.report.plugin:PLUGIN"
+update = "nyxor.plugins.update.plugin:PLUGIN"
+tui = "nyxor.plugins.tui.plugin:PLUGIN"
+audit = "nyxor.plugins.audit.plugin:PLUGIN"
+script = "nyxor.plugins.script.plugin:PLUGIN"
+watch = "nyxor.plugins.watch.plugin:PLUGIN"
+
+[build-system]
+requires = ["uv_build>=0.11.21,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv_build]
+module-name = "nyxor"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# B008: typer's `= typer.Option(...)` / `= typer.Argument(...)` default-value
+# pattern is the documented, idiomatic way to declare CLI parameters.
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/nyxor/core/reporting/html_writer.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
