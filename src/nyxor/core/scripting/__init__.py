@@ -8,19 +8,29 @@ language reference and grammar.
 
 from __future__ import annotations
 
-from nyxor.core.scripting.ast_nodes import Program
+from nyxor.core.scripting.ast_nodes import FuncDef, ImportStmt, Program, function_docstring
+from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
 from nyxor.core.scripting.errors import LexError, ParseError, RuntimeScriptError, ScriptError
-from nyxor.core.scripting.interpreter import Interpreter, run_script
+from nyxor.core.scripting.interpreter import Interpreter, NyxFunction, NyxModule, run_script
 from nyxor.core.scripting.linter import LintIssue, lint_program, lint_source
 from nyxor.core.scripting.parser import parse, parse_expression
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
 from nyxor.core.scripting.template import TEMPLATE
+from nyxor.core.scripting.ui import UI_FUNCTIONS, ScriptUI
 
 __all__ = [
     "TEMPLATE",
     "MODULE_RUNNERS",
+    "BUILTIN_FUNCTIONS",
+    "UI_FUNCTIONS",
     "Program",
+    "FuncDef",
+    "ImportStmt",
+    "function_docstring",
     "Interpreter",
+    "NyxFunction",
+    "NyxModule",
+    "ScriptUI",
     "LintIssue",
     "ScriptError",
     "LexError",

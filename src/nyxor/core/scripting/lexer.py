@@ -19,6 +19,9 @@ KEYWORDS = frozenset(
         "else",
         "end",
         "foreach",
+        "while",
+        "break",
+        "continue",
         "in",
         "run",
         "as",
@@ -30,6 +33,9 @@ KEYWORDS = frozenset(
         "fail",
         "pip",
         "pyblock",
+        "func",
+        "return",
+        "import",
         "true",
         "false",
         "and",
@@ -39,7 +45,7 @@ KEYWORDS = frozenset(
 )
 
 _TWO_CHAR_OPS = {"==": "==", "!=": "!=", "<=": "<=", ">=": ">="}
-_ONE_CHAR_OPS = set("=<>+-*/:()[],")
+_ONE_CHAR_OPS = set("=<>+-*/:()[],.")
 _ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'"}
 
 

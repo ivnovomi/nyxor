@@ -40,7 +40,43 @@ class BinOp:
     line: int
 
 
-Expr = Literal | ListLiteral | VarRef | UnaryOp | BinOp
+@dataclass(frozen=True)
+class Call:
+    """A function call: a plain name (``square(4)``) or a dotted one
+
+    (``math.square(4)`` — a library member, or ``ui.confirm(...)``). The
+    lexer already merges ``name.member`` into a single dotted IDENT token,
+    so ``callee`` is just that string, split on ``.`` at call time.
+    """
+
+    callee: str
+    args: list[Expr]
+    line: int
+
+
+@dataclass(frozen=True)
+class Index:
+    target: Expr
+    index: Expr
+    line: int
+
+
+@dataclass(frozen=True)
+class Attr:
+    """``expr.name`` where ``expr`` isn't a bare identifier (so the lexer's
+
+    dotted-identifier merge doesn't apply) — e.g. ``result[0].module`` or
+    a future ``some_call().field``. Plain ``lib.member``/``r.field`` still
+    goes through :class:`VarRef` via that lexer merge; this node only
+    exists for the postfix case.
+    """
+
+    target: Expr
+    name: str
+    line: int
+
+
+Expr = Literal | ListLiteral | VarRef | UnaryOp | BinOp | Call | Index | Attr
 
 # --- statements ------------------------------------------------------------
 
@@ -109,6 +145,65 @@ class ForeachStmt:
 
 
 @dataclass(frozen=True)
+class WhileStmt:
+    condition: Expr
+    body: list[Stmt]
+    line: int
+
+
+@dataclass(frozen=True)
+class BreakStmt:
+    line: int
+
+
+@dataclass(frozen=True)
+class ContinueStmt:
+    line: int
+
+
+@dataclass(frozen=True)
+class FuncDef:
+    name: str
+    params: list[str]
+    body: list[Stmt]
+    line: int
+
+
+@dataclass(frozen=True)
+class ReturnStmt:
+    value: Expr | None
+    line: int
+
+
+@dataclass(frozen=True)
+class ImportStmt:
+    path: Expr
+    alias: str
+    line: int
+
+
+@dataclass(frozen=True)
+class ExprStmt:
+    """A bare call used for its side effect, e.g. ``ui.confirm("...")`` on its own line."""
+
+    value: Expr
+    line: int
+
+
+@dataclass(frozen=True)
+class DocStmt:
+    """A bare string literal used as a statement — a docstring.
+
+    Purely documentation: a no-op at run time. By convention it's the first
+    statement in a ``func`` body; :func:`function_docstring` is how callers
+    (the interpreter, the LSP) pull it back out.
+    """
+
+    text: str
+    line: int
+
+
+@dataclass(frozen=True)
 class PythonStmt:
     """A ``python: ... end`` block — raw Python, only runs with ``unsafe=True``."""
 
@@ -134,6 +229,14 @@ Stmt = (
     | SaveStmt
     | IfStmt
     | ForeachStmt
+    | WhileStmt
+    | BreakStmt
+    | ContinueStmt
+    | FuncDef
+    | ReturnStmt
+    | ImportStmt
+    | ExprStmt
+    | DocStmt
     | PythonStmt
     | PipStmt
 )
@@ -142,3 +245,10 @@ Stmt = (
 @dataclass(frozen=True)
 class Program:
     body: list[Stmt] = field(default_factory=list)
+
+
+def function_docstring(body: list[Stmt]) -> str | None:
+    """The docstring a function body starts with, if it has one."""
+    if body and isinstance(body[0], DocStmt):
+        return body[0].text
+    return None

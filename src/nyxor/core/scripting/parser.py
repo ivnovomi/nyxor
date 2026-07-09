@@ -12,17 +12,27 @@ import textwrap
 
 from nyxor.core.scripting.ast_nodes import (
     AssertStmt,
+    Attr,
     BinOp,
+    BreakStmt,
+    Call,
+    ContinueStmt,
+    DocStmt,
     Expr,
+    ExprStmt,
     FailStmt,
     ForeachStmt,
+    FuncDef,
     IfStmt,
+    ImportStmt,
+    Index,
     ListLiteral,
     Literal,
     PipStmt,
     PrintStmt,
     Program,
     PythonStmt,
+    ReturnStmt,
     RunStmt,
     SaveStmt,
     SetStmt,
@@ -30,6 +40,7 @@ from nyxor.core.scripting.ast_nodes import (
     Stmt,
     UnaryOp,
     VarRef,
+    WhileStmt,
 )
 from nyxor.core.scripting.errors import ParseError
 from nyxor.core.scripting.lexer import Token, tokenize
@@ -149,6 +160,9 @@ class Parser:
         "set",
         "if",
         "foreach",
+        "while",
+        "break",
+        "continue",
         "run",
         "save",
         "print",
@@ -157,13 +171,35 @@ class Parser:
         "fail",
         "pip",
         "pyblock",
+        "func",
+        "return",
+        "import",
     )
 
     def _parse_statement(self) -> Stmt:
         token = self._peek()
-        if token.type != "IDENT" or token.value not in self._STATEMENT_KEYWORDS:
-            raise ParseError(f"expected a statement, got {token.value!r}", line=token.line)
-        return getattr(self, f"_parse_{token.value}")()  # type: ignore[no-any-return]
+        if token.type == "STRING":
+            # A bare string on its own line is a docstring — by convention
+            # the first statement in a `func` body, but harmless (a no-op)
+            # anywhere else a statement is expected.
+            self._advance()
+            self._end_statement()
+            return DocStmt(text=token.value, line=token.line)
+        if token.type == "IDENT" and token.value in self._STATEMENT_KEYWORDS:
+            return getattr(self, f"_parse_{token.value}")()  # type: ignore[no-any-return]
+        if token.type == "IDENT":
+            # Not a keyword — might be a bare call used for its side effect,
+            # e.g. `ui.confirm("Proceed?")` or `log_finding target` on its own
+            # line. Try it as an expression statement; only accept it if it's
+            # actually a call, so a plain typo'd identifier still errors the
+            # way it always has instead of silently parsing as a no-op.
+            checkpoint = self._pos
+            expr = self.parse_expr()
+            if isinstance(expr, Call) and self._peek().type in ("NEWLINE", "EOF"):
+                self._end_statement()
+                return ExprStmt(value=expr, line=token.line)
+            self._pos = checkpoint
+        raise ParseError(f"expected a statement, got {token.value!r}", line=token.line)
 
     def _parse_set(self) -> SetStmt:
         line = self._advance().line
@@ -200,6 +236,62 @@ class Parser:
         self._expect_ident("end")
         self._end_statement()
         return ForeachStmt(var_name=var_name, iterable=iterable, body=body, line=line)
+
+    def _parse_while(self) -> WhileStmt:
+        line = self._advance().line
+        condition = self.parse_expr()
+        self._expect_op(":")
+        self._end_statement()
+        body = self._parse_block({"end"})
+        self._expect_ident("end")
+        self._end_statement()
+        return WhileStmt(condition=condition, body=body, line=line)
+
+    def _parse_break(self) -> BreakStmt:
+        line = self._advance().line
+        self._end_statement()
+        return BreakStmt(line=line)
+
+    def _parse_continue(self) -> ContinueStmt:
+        line = self._advance().line
+        self._end_statement()
+        return ContinueStmt(line=line)
+
+    def _parse_func(self) -> FuncDef:
+        line = self._advance().line
+        name = self._expect_type("IDENT", "a function name").value
+        if "." in name:
+            raise ParseError(f"function names can't contain '.': {name!r}", line=line)
+        self._expect_op("(")
+        params: list[str] = []
+        if self._peek().type != ")":
+            params.append(self._expect_type("IDENT", "a parameter name").value)
+            while self._peek().type == ",":
+                self._advance()
+                params.append(self._expect_type("IDENT", "a parameter name").value)
+        self._expect_op(")")
+        self._expect_op(":")
+        self._end_statement()
+        body = self._parse_block({"end"})
+        self._expect_ident("end")
+        self._end_statement()
+        return FuncDef(name=name, params=params, body=body, line=line)
+
+    def _parse_return(self) -> ReturnStmt:
+        line = self._advance().line
+        value: Expr | None = None
+        if self._peek().type not in ("NEWLINE", "EOF"):
+            value = self.parse_expr()
+        self._end_statement()
+        return ReturnStmt(value=value, line=line)
+
+    def _parse_import(self) -> ImportStmt:
+        line = self._advance().line
+        path = self.parse_expr()
+        self._expect_ident("as")
+        alias = self._expect_type("IDENT", "an alias name").value
+        self._end_statement()
+        return ImportStmt(path=path, alias=alias, line=line)
 
     def _parse_run(self) -> RunStmt:
         line = self._advance().line
@@ -312,7 +404,38 @@ class Parser:
         if self._peek().type == "-":
             line = self._advance().line
             return UnaryOp("-", self._parse_unary(), line)
-        return self._parse_primary()
+        return self._parse_postfix()
+
+    def _parse_postfix(self) -> Expr:
+        """Handles call ``f(a, b)`` and index ``x[i]`` suffixes, chainable."""
+        expr = self._parse_primary()
+        while True:
+            if self._peek().type == "(":
+                if not isinstance(expr, VarRef):
+                    raise ParseError("only a name can be called", line=self._peek().line)
+                line = self._advance().line
+                args: list[Expr] = []
+                if self._peek().type != ")":
+                    args.append(self.parse_expr())
+                    while self._peek().type == ",":
+                        self._advance()
+                        args.append(self.parse_expr())
+                self._expect_op(")")
+                expr = Call(callee=expr.name, args=args, line=line)
+                continue
+            if self._peek().type == "[":
+                line = self._advance().line
+                index_expr = self.parse_expr()
+                self._expect_op("]")
+                expr = Index(target=expr, index=index_expr, line=line)
+                continue
+            if self._peek().type == ".":
+                line = self._advance().line
+                member = self._expect_type("IDENT", "an attribute name").value
+                expr = Attr(target=expr, name=member, line=line)
+                continue
+            break
+        return expr
 
     def _parse_primary(self) -> Expr:
         token = self._peek()
