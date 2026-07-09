@@ -1,5 +1,7 @@
 # NYXOR
 
+[![CI](https://github.com/ivnovomi/nyxor/actions/workflows/ci.yml/badge.svg)](https://github.com/ivnovomi/nyxor/actions/workflows/ci.yml)
+
 NYXOR is a modular, cross-platform security **assessment and infrastructure
 auditing** toolkit. It is not a hacking framework — it discovers, inspects,
 and reports on infrastructure (hosts, DNS, TLS, HTTP) using only safe,
