@@ -1,6 +1,6 @@
 [project]
 name = "nyxor"
-version = "0.1.0"
+version = "0.2.0"
 description = "NYXOR — a modular, cross-platform security assessment and infrastructure auditing toolkit."
 readme = "README.md"
 authors = [
