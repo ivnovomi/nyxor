@@ -39,6 +39,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "dns": {"resolvers": [], "timeout_seconds": 5.0},
     "tls": {"timeout_seconds": 5.0},
     "http": {"timeout_seconds": 10.0, "follow_redirects": True, "max_redirects": 10},
+    "ai": {
+        "ollama_host": "http://localhost:11434",
+        "model": "llama3.2",
+        "timeout_seconds": 30.0,
+    },
     "plugins": {"disabled": []},
     "profiles": {},
 }
@@ -71,6 +76,20 @@ class HttpConfig(BaseModel):
     max_redirects: int = 10
 
 
+class AiConfig(BaseModel):
+    """Where to find a local LLM for `nyx analyze`.
+
+    Points at Ollama's default local address by default — no API key, no
+    network call to anyone but the model running on this machine. NYXOR
+    Cloud offers the same command against a hosted model for machines that
+    don't want to run one themselves.
+    """
+
+    ollama_host: str = "http://localhost:11434"
+    model: str = "llama3.2"
+    timeout_seconds: float = 30.0
+
+
 class PluginsConfig(BaseModel):
     disabled: list[str] = Field(default_factory=list)
 
@@ -83,6 +102,7 @@ class NyxorConfig(BaseModel):
     dns: DnsConfig = Field(default_factory=DnsConfig)
     tls: TlsConfig = Field(default_factory=TlsConfig)
     http: HttpConfig = Field(default_factory=HttpConfig)
+    ai: AiConfig = Field(default_factory=AiConfig)
     plugins: PluginsConfig = Field(default_factory=PluginsConfig)
     profiles: dict[str, dict[str, Any]] = Field(default_factory=dict)
     active_profile: str | None = None
