@@ -18,3 +18,6 @@ nyxor-output/
 .ruff_cache/
 .coverage
 htmlcov/
+
+# Local tooling
+.claude/

@@ -1,9 +1,12 @@
 # Writing a NYXOR plugin
 
-A plugin is a Python package that declares an entry point in the
-`nyxor.plugins` group and exposes an object satisfying the `Plugin`
-protocol (`nyxor.core.interfaces.Plugin`). That's the entire contract —
-there is no central registry to edit, in this repository or in yours.
+Fifteen minutes from now you can have a new `nyx <yourthing>` command
+shipping findings through the exact same reporting pipeline as `nyx audit`
+— JSON, Markdown, HTML, `--output`, all of it, for free. A plugin is a
+Python package that declares an entry point in the `nyxor.plugins` group
+and exposes an object satisfying the `Plugin` protocol
+(`nyxor.core.interfaces.Plugin`). That's the entire contract — there is no
+central registry to edit, in this repository or in yours.
 
 ## 1. Implement the plugin
 
@@ -81,6 +84,23 @@ function with no Typer/Textual imports, and call it from your command —
 see `plugins/dns_/plugin.py::run_lookup` for the pattern. The TUI's Scan
 tab (`plugins/tui/app.py::_dispatch`) already does this for the built-in
 network/dns/tls/http plugins.
+
+Want your module callable from [NyxScript](../README.md#nyxscript) too —
+`run mymodule example.com as result`? Add it to `MODULE_RUNNERS` in
+`nyxor/core/scripting/stdlib.py`:
+
+```python
+async def _run_mymodule(target: str, config: NyxorConfig) -> list[ModuleResult]:
+    from my_package.plugin import run_mymodule
+    return [await run_mymodule(target, config)]
+
+MODULE_RUNNERS["mymodule"] = _run_mymodule
+```
+
+Do this and `nyx script lint` will validate `run mymodule ...` statements,
+suggest it via "did you mean" on typos, and both the TUI's completion box
+and the VS Code extension will offer it as a completion — automatically,
+because they all read from the same `MODULE_RUNNERS` dict.
 
 ## Disabling a plugin
 

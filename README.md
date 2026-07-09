@@ -1,13 +1,46 @@
-# NYXOR
+<div align="center">
+
+<img src="docs/assets/banner.png" alt="NYXOR — modular security toolkit" width="100%">
 
 [![CI](https://github.com/ivnovomi/nyxor/actions/workflows/ci.yml/badge.svg)](https://github.com/ivnovomi/nyxor/actions/workflows/ci.yml)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13%2B-7ee7e1)](https://www.python.org/)
+[![uv](https://img.shields.io/badge/managed%20by-uv-b98cff)](https://docs.astral.sh/uv/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ecc71)](LICENSE)
+
+**Discover. Analyze. Audit. Report.** — a security toolkit with its own
+scripting language, a full-screen terminal dashboard, and a language server
+your editor can talk to.
+
+</div>
+
+---
 
 NYXOR is a modular, cross-platform security **assessment and infrastructure
-auditing** toolkit. It is not a hacking framework — it discovers, inspects,
-and reports on infrastructure (hosts, DNS, TLS, HTTP) using only safe,
-authorized-use techniques: TCP-connect checks, standard DNS lookups, TLS
-handshakes, and HTTP requests. No exploitation, no packet crafting, no raw
-sockets.
+auditing** toolkit. It is *not* a hacking framework — everything it does is a
+safe, non-destructive observation: TCP-connect checks, standard DNS lookups,
+TLS handshakes, HTTP requests. No exploitation, no packet crafting, no raw
+sockets, nothing that needs elevated privileges. Point it at something you're
+authorized to check, and it tells you exactly what it found.
+
+What makes it more than a wrapper around a few scanners:
+
+- **A real automation language.** [NyxScript](#nyxscript) isn't a config
+  format bolted onto a scanner — it has its own lexer, parser, AST,
+  tree-walking interpreter, and a *static linter* that catches your typos
+  before you burn a network round-trip on them. It even has a
+  [Language Server](#editor-support) and a VS Code extension.
+- **A dashboard, not just a CLI.** `nyx tui` is a full Textual application —
+  live scans, a syntax-highlighted script editor with autocomplete, a
+  plugin browser you can edit in place — built on the *exact same functions*
+  the CLI calls. Nothing is reimplemented twice.
+- **A grade, not just a wall of JSON.** `nyx audit` scores what it finds
+  (0–100, SSL-Labs style) and hands you a letter grade plus an embeddable
+  SVG badge. `nyx watch` reruns it on a schedule and only speaks up when
+  the grade — or the findings behind it — actually change.
+- **Everything is a plugin.** The Core is deliberately tiny: CLI wiring,
+  config, logging, the plugin loader, the reporting framework. Every
+  capability — including the ones that ship in the box — is discovered
+  through the same entry-point mechanism a third-party package would use.
 
 ```
 nyx doctor              # environment diagnostics
@@ -27,6 +60,30 @@ nyx config show         # effective configuration
 ```
 
 Run `nyx` with no arguments for the banner + command list.
+
+## Quickstart
+
+```bash
+uv sync --extra dev
+uv run nyx audit example.com
+```
+
+That's a live DNS + TLS + HTTP assessment with a letter grade, in one
+command, with zero configuration.
+
+## Table of contents
+
+- [Security grade & badges](#security-grade--badges)
+- [The dashboard](#the-dashboard)
+- [NyxScript](#nyxscript)
+  - [Escape hatches: `python:` and `pip`](#escape-hatches-python-and-pip)
+  - [Editor support](#editor-support)
+- [Requirements & install](#requirements)
+- [Global options](#global-options)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Testing](#testing)
+- [Contributing](#contributing)
 
 ## Security grade & badges
 
@@ -158,7 +215,8 @@ nyx script lsp   # run by your editor, not by hand — speaks LSP over stdio
 
 - **VS Code**: install the extension in
   [editors/vscode-nyxscript](editors/vscode-nyxscript) (syntax highlighting
-  + the language server, `python:` blocks highlighted as embedded Python).
+  + the language server, `python:` blocks highlighted as embedded Python,
+  its own file icon).
 - **Neovim** (0.10+, built-in LSP client):
   ```lua
   vim.filetype.add({ extension = { nyx = "nyxscript" } })
@@ -238,6 +296,10 @@ uv run pytest
 uv run ruff check .
 uv run mypy src
 ```
+
+CI runs the same checks — plus the full pytest suite on Linux, Windows, and
+macOS, and a VS Code extension compile check — on every push and PR. See
+the badge at the top of this file.
 
 ## Contributing
 
