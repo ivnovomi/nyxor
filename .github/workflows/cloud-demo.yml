@@ -1,0 +1,50 @@
+name: NYXOR Cloud (demo)
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Domain to audit
+        default: example.com
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nyxor-cloud
+  cancel-in-progress: false
+
+jobs:
+  cloud-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run NYXOR Cloud audit
+        id: nyxor
+        uses: ./
+        with:
+          target: ${{ github.event.inputs.target || 'example.com' }}
+          report-path: cloud/report.html
+          badge-path: cloud/badge.svg
+
+      - name: Commit results
+        env:
+          NYXOR_TARGET: ${{ github.event.inputs.target || 'example.com' }}
+          NYXOR_GRADE: ${{ steps.nyxor.outputs.grade }}
+        run: |
+          set -euo pipefail
+          # NYXOR_TARGET/NYXOR_GRADE arrive via env:, not spliced into this
+          # script by ${{ }} expansion — see action.yml for why that matters.
+          git config user.name "nyxor-cloud[bot]"
+          git config user.email "actions@users.noreply.github.com"
+          git add cloud/
+          if git diff --cached --quiet; then
+            echo "No change in results — nothing to commit."
+            exit 0
+          fi
+          git commit -m "cloud: audit $NYXOR_TARGET — grade $NYXOR_GRADE"
+          git push

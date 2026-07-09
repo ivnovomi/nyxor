@@ -32,6 +32,7 @@ dependencies = [
     "jinja2>=3.1.4",
     "pyyaml>=6.0.2",
     "textual>=1.0.0",
+    "numpy>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +50,7 @@ lsp = [
 api = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.scripts]
@@ -74,6 +76,9 @@ audit = "nyxor.plugins.audit.plugin:PLUGIN"
 script = "nyxor.plugins.script.plugin:PLUGIN"
 watch = "nyxor.plugins.watch.plugin:PLUGIN"
 serve = "nyxor.plugins.serve.plugin:PLUGIN"
+auth = "nyxor.plugins.auth.plugin:PLUGIN"
+trends = "nyxor.plugins.trends.plugin:PLUGIN"
+analyze = "nyxor.plugins.analyze.plugin:PLUGIN"
 
 [build-system]
 requires = ["uv_build>=0.11.21,<0.12.0"]
