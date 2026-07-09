@@ -196,9 +196,7 @@ def _hostname_from_target(raw: str) -> str:
     return raw
 
 
-def _reject_if_unsafe_ip(
-    ip: ipaddress.IPv4Address | ipaddress.IPv6Address, hostname: str
-) -> None:
+def _reject_if_unsafe_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, hostname: str) -> None:
     unsafe = (
         ip.is_private
         or ip.is_loopback

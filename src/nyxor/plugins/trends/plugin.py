@@ -61,8 +61,7 @@ def show(
     context.console.print(f"[bold]Trend — {domain}[/bold]  ({stats.n} run(s) considered)")
     context.console.print(f"  {stats.sparkline}")
     context.console.print(
-        f"  mean {stats.mean:.1f}  ·  std {stats.std:.1f}  ·  "
-        f"range {stats.minimum}-{stats.maximum}"
+        f"  mean {stats.mean:.1f}  ·  std {stats.std:.1f}  ·  range {stats.minimum}-{stats.maximum}"
     )
     context.console.print(
         f"  trend: [{direction_style}]{stats.direction}[/{direction_style}] "
