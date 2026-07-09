@@ -46,7 +46,7 @@ from nyxor.core.models import ModuleResult, Severity
 from nyxor.core.plugins import DiscoveredPlugin, discover_plugins
 from nyxor.core.reporting import ReportDocument, get_writer
 from nyxor.core.scripting import TEMPLATE as SCRIPT_TEMPLATE
-from nyxor.core.scripting import LintIssue, lint_source, run_script
+from nyxor.core.scripting import LintIssue, ScriptUI, lint_source, run_script
 from nyxor.plugins.audit.plugin import run_audit
 from nyxor.plugins.dns_.plugin import run_lookup as dns_run_lookup
 from nyxor.plugins.http_.plugin import run_inspect as http_run_inspect
@@ -55,6 +55,7 @@ from nyxor.plugins.network.plugin import run_discover as network_run_discover
 from nyxor.plugins.network.plugin import run_scan as network_run_scan
 from nyxor.plugins.system.doctor import run_diagnostics
 from nyxor.plugins.tls_.plugin import run_inspect as tls_run_inspect
+from nyxor.plugins.tui.browser import ScriptBrowserScreen
 from nyxor.plugins.tui.editor import CompletionPopup, NyxScriptEditor
 
 PLUGIN_SKELETON = '''\
@@ -360,6 +361,7 @@ class NyxorApp(App[None]):
             with TabPane("Script", id="script"):
                 with Horizontal(id="script-toolbar"):
                     yield Input(value="script.nyx", id="script-path")
+                    yield Button("Browse…", id="script-browse")
                     yield Button("Open", id="script-open")
                     yield Button("Save", id="script-save")
                     yield Button("Lint", id="script-lint")
@@ -476,6 +478,8 @@ class NyxorApp(App[None]):
             self.export_inventory()
         elif event.button.id == "run-scan":
             self.run_scan()
+        elif event.button.id == "script-browse":
+            self.browse_for_script()
         elif event.button.id == "script-open":
             self.open_script()
         elif event.button.id == "script-save":
@@ -518,6 +522,21 @@ class NyxorApp(App[None]):
             return
         self.query_one("#script-editor", TextArea).text = path.read_text(encoding="utf-8")
         status.update(f"[#2ecc71]Loaded[/] {path}")
+
+    def browse_for_script(self) -> None:
+        current = Path(self.query_one("#script-path", Input).value.strip())
+        start_dir = current.parent if current.parent.is_dir() else Path.cwd()
+        self.push_screen(ScriptBrowserScreen(start_dir), self._on_script_chosen)
+
+    def _on_script_chosen(self, path: Path | None) -> None:
+        if path is None:
+            return
+        try:
+            display_path = path.relative_to(Path.cwd())
+        except ValueError:
+            display_path = path
+        self.query_one("#script-path", Input).value = str(display_path)
+        self.open_script()
 
     def save_script(self) -> None:
         path = Path(self.query_one("#script-path", Input).value.strip())
@@ -572,8 +591,15 @@ class NyxorApp(App[None]):
         def emit(line: str) -> None:
             log.write(line)
 
+        # ui.confirm/input/select need the real terminal, which Textual is
+        # currently holding onto — ScriptUI(app=self) wraps each of those in
+        # App.suspend(), which hands the terminal back for just that prompt.
+        ui = ScriptUI(app=self)
+
         try:
-            await run_script(source, self.config, output=emit, base_dir=Path.cwd(), unsafe=unsafe)
+            await run_script(
+                source, self.config, output=emit, base_dir=Path.cwd(), unsafe=unsafe, ui=ui
+            )
         except NyxorError as exc:
             log.write(f"[bold #ff4d6d]Error:[/] {exc.message}")
             status.update("[bold #ff4d6d]Script failed.[/]")

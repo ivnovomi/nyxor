@@ -12,15 +12,29 @@ lazily by the CLI so the base install doesn't need pygls at all.
 
 from __future__ import annotations
 
+import os
 import re
+from pathlib import Path
 
 from lsprotocol import types
 from pygls.lsp.server import LanguageServer
+from pygls.uris import to_fs_path
 from pygls.workspace import TextDocument
 
+from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
 from nyxor.core.scripting.lexer import KEYWORDS
 from nyxor.core.scripting.linter import LintIssue, lint_source
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
+from nyxor.core.scripting.ui import UI_FUNCTIONS
+from nyxor.lsp.analysis import (
+    FunctionInfo,
+    find_nyx_files,
+    function_hover_text,
+    parse_best_effort,
+    resolve_import_path,
+    top_level_functions,
+    top_level_imports,
+)
 
 server = LanguageServer("nyxscript-lsp", "v0.1.0")
 
@@ -35,6 +49,43 @@ _ACTION_DOCS = {
     "fail": '`fail "message"` — abort the script unconditionally.',
     "sleep": "`sleep SECONDS` — pause the script.",
     "pip": '`pip "package"` — install a package (requires --unsafe).',
+    "func": "`func NAME(params):` ... `return EXPR` ... `end` — define a function.",
+    "return": "`return [EXPR]` — return from the current function.",
+    "while": "`while EXPR:` ... `end` — loop while EXPR is true.",
+    "break": "`break` — exit the current loop.",
+    "continue": "`continue` — skip to the next loop iteration.",
+    "import": '`import "lib.nyx" as NAME` — load functions from another script.',
+}
+
+_BUILTIN_DOCS = {
+    "len": "`len(x)` — length of a list or string.",
+    "range": "`range(n)` / `range(a, b)` / `range(a, b, step)` — a list of integers.",
+    "upper": "`upper(s)` — uppercase a string.",
+    "lower": "`lower(s)` — lowercase a string.",
+    "strip": "`strip(s)` — trim whitespace from both ends.",
+    "split": "`split(s, sep)` — split a string into a list.",
+    "join": "`join(list, sep)` — join a list into a string.",
+    "contains": "`contains(collection, item)` — membership test.",
+    "str": "`str(x)` — convert to a string.",
+    "int": "`int(x)` — convert to an integer.",
+    "float": "`float(x)` — convert to a float.",
+    "abs": "`abs(x)` — absolute value.",
+    "round": "`round(x[, digits])` — round a number.",
+    "sorted": "`sorted(list)` — a new sorted list.",
+    "reversed": "`reversed(list)` — a new reversed list.",
+    "min": "`min(list)` / `min(a, b, ...)` — smallest value.",
+    "max": "`max(list)` / `max(a, b, ...)` — largest value.",
+    "sum": "`sum(list)` — total of a list of numbers.",
+    "type_of": "`type_of(x)` — the runtime type name as a string.",
+}
+
+_UI_DOCS = {
+    "ui.confirm": '`ui.confirm("question?")` — yes/no prompt, returns bool.',
+    "ui.input": '`ui.input("prompt")` — free-text prompt, returns a string.',
+    "ui.select": '`ui.select("prompt", ["a", "b"])` — choice prompt, returns a string.',
+    "ui.table": "`ui.table(headers, rows)` — print a table.",
+    "ui.banner": '`ui.banner("text")` — print a rule with a heading.',
+    "ui.status": '`ui.status("message")` — print a status line.',
 }
 
 _MODULE_DOCS = {
@@ -47,7 +98,58 @@ _MODULE_DOCS = {
 }
 
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
-_VAR_DEF_RE = re.compile(r"\b(?:set|foreach|as)\s+(\w+)\b")
+_VAR_DEF_RE = re.compile(r"\b(?:set|foreach|as|func)\s+(\w+)\b")
+_IMPORT_PATH_RE = re.compile(r'\bimport\s+"([^"]*)$')
+
+
+def _word_at(document: TextDocument, position: types.Position) -> str | None:
+    lines = document.source.splitlines()
+    if position.line >= len(lines):
+        return None
+    line = lines[position.line]
+    for match in _WORD_RE.finditer(line):
+        if match.start() <= position.character <= match.end():
+            return match.group(0)
+    return None
+
+
+def _resolve_function_reference(
+    ls: LanguageServer, document: TextDocument, word: str
+) -> tuple[str, FunctionInfo, str | None] | None:
+    """Find a `func` a hover/definition word refers to — same file or an
+    imported library. Returns (uri, info, a friendly relative-path label —
+    or None when it's defined in this same document)."""
+    program = parse_best_effort(document.source)
+    if program is None:
+        return None
+
+    functions = top_level_functions(program)
+    if word in functions:
+        return document.uri, functions[word], None
+
+    if "." not in word:
+        return None
+    alias, member = word.split(".", 1)
+    imports = top_level_imports(program)
+    root_path = ls.workspace.root_path
+    if alias not in imports or not root_path:
+        return None
+
+    root = Path(root_path)
+    target = resolve_import_path(root, imports[alias].path)
+    if not target.is_file():
+        return None
+    lib_program = parse_best_effort(target.read_text(encoding="utf-8"))
+    if lib_program is None:
+        return None
+    lib_functions = top_level_functions(lib_program)
+    if member not in lib_functions:
+        return None
+    try:
+        label = target.relative_to(root).as_posix()
+    except ValueError:
+        label = str(target)
+    return target.as_uri(), lib_functions[member], label
 
 
 def _severity_for(issue: LintIssue) -> types.DiagnosticSeverity:
@@ -92,12 +194,48 @@ def did_save(ls: LanguageServer, params: types.DidSaveTextDocumentParams) -> Non
     _publish_diagnostics(ls, ls.workspace.get_text_document(params.text_document.uri))
 
 
+def _same_file(path: Path, uri: str) -> bool:
+    """Compare a filesystem path against a `file://` URI, ignoring the
+
+    drive-letter-case differences Windows LSP clients are inconsistent
+    about (`file:///C:/...` vs `file:///c:/...` refer to the same file).
+    """
+    fs_path = to_fs_path(uri)
+    if fs_path is None:
+        return False
+    return os.path.normcase(str(path)) == os.path.normcase(fs_path)
+
+
+def _import_path_completions(ls: LanguageServer, current_uri: str) -> types.CompletionList:
+    root_path = ls.workspace.root_path
+    if not root_path:
+        return types.CompletionList(is_incomplete=False, items=[])
+    root = Path(root_path)
+    items = [
+        types.CompletionItem(
+            label=path.relative_to(root).as_posix(),
+            kind=types.CompletionItemKind.File,
+            detail="NyxScript library",
+        )
+        for path in find_nyx_files(root)
+        if not _same_file(path, current_uri)  # importing yourself isn't a useful suggestion
+    ]
+    return types.CompletionList(is_incomplete=False, items=items)
+
+
 @server.feature(
     types.TEXT_DOCUMENT_COMPLETION,
-    types.CompletionOptions(trigger_characters=list("abcdefghijklmnopqrstuvwxyz")),
+    types.CompletionOptions(trigger_characters=[*"abcdefghijklmnopqrstuvwxyz", '"']),
 )
 def completions(ls: LanguageServer, params: types.CompletionParams) -> types.CompletionList:
     document = ls.workspace.get_text_document(params.text_document.uri)
+
+    lines = document.source.splitlines()
+    if params.position.line < len(lines):
+        before_cursor = lines[params.position.line][: params.position.character]
+        if _IMPORT_PATH_RE.search(before_cursor):
+            return _import_path_completions(ls, document.uri)
+
     variables = sorted(set(_VAR_DEF_RE.findall(document.source)))
 
     items = [
@@ -113,6 +251,22 @@ def completions(ls: LanguageServer, params: types.CompletionParams) -> types.Com
         for name in sorted(MODULE_RUNNERS)
     ]
     items += [
+        types.CompletionItem(
+            label=name,
+            kind=types.CompletionItemKind.Function,
+            detail=_BUILTIN_DOCS.get(name, ""),
+        )
+        for name in sorted(BUILTIN_FUNCTIONS)
+    ]
+    items += [
+        types.CompletionItem(
+            label=f"ui.{name}",
+            kind=types.CompletionItemKind.Function,
+            detail=_UI_DOCS.get(f"ui.{name}", ""),
+        )
+        for name in sorted(UI_FUNCTIONS)
+    ]
+    items += [
         types.CompletionItem(label=name, kind=types.CompletionItemKind.Variable)
         for name in variables
     ]
@@ -122,25 +276,50 @@ def completions(ls: LanguageServer, params: types.CompletionParams) -> types.Com
 @server.feature(types.TEXT_DOCUMENT_HOVER)
 def hover(ls: LanguageServer, params: types.HoverParams) -> types.Hover | None:
     document = ls.workspace.get_text_document(params.text_document.uri)
-    lines = document.source.splitlines()
-    if params.position.line >= len(lines):
-        return None
-    line = lines[params.position.line]
-
-    word = None
-    for match in _WORD_RE.finditer(line):
-        if match.start() <= params.position.character <= match.end():
-            word = match.group(0)
-            break
+    word = _word_at(document, params.position)
     if word is None:
         return None
 
-    doc_text = _ACTION_DOCS.get(word) or (
-        f"NYXOR module: {_MODULE_DOCS[word]}" if word in _MODULE_DOCS else None
+    resolved = _resolve_function_reference(ls, document, word)
+    if resolved is not None:
+        _uri, info, source_label = resolved
+        return types.Hover(
+            contents=types.MarkupContent(
+                kind=types.MarkupKind.Markdown,
+                value=function_hover_text(info, source_label=source_label),
+            )
+        )
+
+    doc_text = (
+        _ACTION_DOCS.get(word)
+        or _BUILTIN_DOCS.get(word)
+        or _UI_DOCS.get(word)
+        or (f"NYXOR module: {_MODULE_DOCS[word]}" if word in _MODULE_DOCS else None)
     )
     if doc_text is None:
         return None
     return types.Hover(contents=types.MarkupContent(kind=types.MarkupKind.Markdown, value=doc_text))
+
+
+@server.feature(types.TEXT_DOCUMENT_DEFINITION)
+def definition(ls: LanguageServer, params: types.DefinitionParams) -> types.Location | None:
+    document = ls.workspace.get_text_document(params.text_document.uri)
+    word = _word_at(document, params.position)
+    if word is None:
+        return None
+
+    resolved = _resolve_function_reference(ls, document, word)
+    if resolved is None:
+        return None
+    uri, info, _label = resolved
+    target_line = max(info.line - 1, 0)
+    return types.Location(
+        uri=uri,
+        range=types.Range(
+            start=types.Position(line=target_line, character=0),
+            end=types.Position(line=target_line, character=200),
+        ),
+    )
 
 
 def main() -> None:

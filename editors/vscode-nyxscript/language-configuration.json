@@ -19,7 +19,7 @@
     ["'", "'"]
   ],
   "indentationRules": {
-    "increaseIndentPattern": "^\\s*(if|foreach|python)\\b.*:\\s*$",
+    "increaseIndentPattern": "^\\s*(if|foreach|while|func|python)\\b.*:\\s*$",
     "decreaseIndentPattern": "^\\s*(end|else)\\b"
   }
 }
