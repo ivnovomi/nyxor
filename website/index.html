@@ -5,25 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NYXOR — security auditing that fits in your terminal</title>
 <meta name="description" content="NYXOR discovers, analyzes, and audits infrastructure — network, DNS, TLS, HTTP — from a CLI, a TUI, a REST API, or its own scripting language. Free core, MIT licensed. Managed Cloud for teams.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23050604%22/><path d=%22M50 18 L82 50 L50 82 L18 50 Z%22 fill=%22none%22 stroke=%22%2339ff8a%22 stroke-width=%226%22/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%23F6F1E7%22/><path d=%22M50 18 L82 50 L50 82 L18 50 Z%22 fill=%22none%22 stroke=%22%232F5D46%22 stroke-width=%226%22/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css?v=3">
 <noscript><style>.reveal{opacity:1!important;transform:none!important;}</style></noscript>
 </head>
 <body>
 
 <header class="topbar">
   <div class="wrap topbar-inner">
-    <a href="#top" class="brand"><span class="brand-dot" aria-hidden="true"></span>NYXOR <span class="brand-path">/toolkit</span></a>
+    <a href="#top" class="brand"><svg viewBox="0 0 24 24" class="brand-mark" aria-hidden="true"><path d="M4 6L10 12L4 18" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="13" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>NYXOR</a>
     <input type="checkbox" id="nav-toggle" class="nav-toggle-check">
     <nav class="toplinks" aria-label="Primary">
-      <a href="#features">product</a>
-      <a href="#nyxscript">language</a>
-      <a href="#pricing">pricing</a>
-      <a href="#faq">faq</a>
-      <a href="https://github.com/ivnovomi/nyxor" target="_blank" rel="noopener">github</a>
+      <a href="#features">Product</a>
+      <a href="#nyxscript">Language</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/ivnovomi/nyxor" target="_blank" rel="noopener">GitHub</a>
     </nav>
     <label for="nav-toggle" class="nav-toggle-btn" aria-label="Toggle menu"><span></span><span></span><span></span></label>
   </div>
@@ -34,7 +34,7 @@
   <section class="hero wrap">
     <div class="hero-grid">
       <div>
-        <p class="tag-line reveal"><span class="dot" aria-hidden="true"></span> nyx --version 0.1 · MIT licensed</p>
+        <p class="tag-line reveal"><span class="dot" aria-hidden="true"></span> Version 0.2 · MIT licensed</p>
         <h1 class="reveal">Point it at a domain.<br>Get a <span class="hl">letter grade</span><br>back in seconds.</h1>
         <p class="hero-sub reveal">
           NYXOR audits network, DNS, TLS, and HTTP posture and reduces it
@@ -43,8 +43,8 @@
           to create.
         </p>
         <div class="hero-ctas reveal">
-          <a href="#install" class="btn btn-solid btn-lg">install nyxor</a>
-          <a href="#nyxscript" class="btn btn-lg">read the docs</a>
+          <a href="#install" class="btn btn-solid btn-lg">Install NYXOR</a>
+          <a href="#nyxscript" class="btn btn-lg">Read the docs</a>
         </div>
         <div class="badge-row reveal">
           <span class="mini-badge"><b>4</b>&nbsp;front-ends</span>
@@ -78,17 +78,41 @@
   <section id="features" class="section">
     <div class="wrap">
       <div class="sec-head">
-        <p class="sec-num reveal">01 / product</p>
+        <p class="sec-num reveal">01 — Product</p>
         <h2 class="reveal">Everything a scanner should be</h2>
         <p class="sec-sub reveal">Network, DNS, TLS, and HTTP inspection are table stakes. Here's what's on top.</p>
       </div>
-      <div class="flist reveal">
-        <div class="fitem"><div class="fi-head"><span class="icon">#</span><h3>Live security grades</h3></div><p><code>nyx audit</code> scores every run 0–100 and hands you an SSL-Labs-style letter grade, plus a live SVG badge for your README.</p></div>
-        <div class="fitem"><div class="fi-head"><span class="icon">#</span><h3>NyxScript</h3></div><p>A real language: its own lexer, parser, AST, interpreter, and a static linter that catches typos before a request leaves your machine.</p></div>
-        <div class="fitem"><div class="fi-head"><span class="icon">#</span><h3>A dashboard, not just a CLI</h3></div><p><code>nyx tui</code> is a full terminal app — live scans, a syntax-highlighted script editor with autocomplete, a plugin browser you can edit in place.</p></div>
-        <div class="fitem"><div class="fi-head"><span class="icon">#</span><h3>Safe by design</h3></div><p>TCP-connect scans, standard DNS/TLS/HTTP requests — no packet crafting, no raw sockets, nothing that needs elevated privileges.</p></div>
-        <div class="fitem"><div class="fi-head"><span class="icon">#</span><h3>A REST API</h3></div><p>A fourth front-end over the same functions — <code>GET /audit/&#123;domain&#125;</code>, <code>GET /badge/&#123;domain&#125;.svg</code> — no scan logic reimplemented for HTTP. SSRF-guarded by default.</p></div>
-        <div class="fitem"><div class="fi-head"><span class="icon">#</span><h3>Continuous watch</h3></div><p><code>nyx watch</code> re-audits on an interval and stays quiet until something actually changes: a new finding, a resolved one, a grade shift.</p></div>
+      <div class="feature-index reveal">
+        <article class="feature-row">
+          <span class="feature-no">01</span>
+          <h3>Live security grades</h3>
+          <p><code>nyx audit</code> scores every run 0–100 and hands you an SSL-Labs-style letter grade, plus a live SVG badge for your README.</p>
+        </article>
+        <article class="feature-row">
+          <span class="feature-no">02</span>
+          <h3>NyxScript</h3>
+          <p>A real language: its own lexer, parser, AST, interpreter, and a static linter that catches typos before a request leaves your machine.</p>
+        </article>
+        <article class="feature-row">
+          <span class="feature-no">03</span>
+          <h3>A dashboard, not just a CLI</h3>
+          <p><code>nyx tui</code> is a full terminal app — live scans, a syntax-highlighted script editor with autocomplete, a plugin browser you can edit in place.</p>
+        </article>
+        <article class="feature-row">
+          <span class="feature-no">04</span>
+          <h3>Safe by design</h3>
+          <p>TCP-connect scans, standard DNS/TLS/HTTP requests — no packet crafting, no raw sockets, nothing that needs elevated privileges.</p>
+        </article>
+        <article class="feature-row">
+          <span class="feature-no">05</span>
+          <h3>A REST API</h3>
+          <p>A fourth front-end over the same functions — <code>GET /audit/&#123;domain&#125;</code>, <code>GET /badge/&#123;domain&#125;.svg</code> — no scan logic reimplemented for HTTP. SSRF-guarded by default.</p>
+        </article>
+        <article class="feature-row">
+          <span class="feature-no">06</span>
+          <h3>Continuous watch</h3>
+          <p><code>nyx watch</code> re-audits on an interval and stays quiet until something actually changes: a new finding, a resolved one, a grade shift.</p>
+        </article>
       </div>
     </div>
   </section>
@@ -96,7 +120,7 @@
   <section id="nyxscript" class="section">
     <div class="wrap">
       <div class="sec-head">
-        <p class="sec-num reveal">02 / language</p>
+        <p class="sec-num reveal">02 — Language</p>
         <h2 class="reveal">A language, not a config file</h2>
         <p class="sec-sub reveal">Variables, loops, string interpolation, and a static linter — all before a single request leaves the machine.</p>
       </div>
@@ -124,7 +148,7 @@
   <section id="architecture" class="section">
     <div class="wrap">
       <div class="sec-head">
-        <p class="sec-num reveal">03 / architecture</p>
+        <p class="sec-num reveal">03 — Architecture</p>
         <h2 class="reveal">One scan. Four surfaces.</h2>
         <p class="sec-sub reveal">Every module is a single <code>async def run_*()</code> function — called four ways, never reimplemented.</p>
       </div>
@@ -140,10 +164,10 @@
   <section id="cloud" class="section">
     <div class="wrap cloud-grid">
       <div>
-        <p class="sec-num reveal">04 / cloud</p>
+        <p class="sec-num reveal">04 — Cloud</p>
         <h2 class="reveal">Zero infrastructure — no waitlist required</h2>
         <p class="sec-sub reveal">Ahead of the managed dashboard, the engine already runs as a GitHub Action. It installs NYXOR from source on a runner GitHub gives you for free, audits your target, and returns the grade as a workflow output.</p>
-        <a href="https://github.com/ivnovomi/nyxor/blob/main/action.yml" class="btn btn-solid reveal" target="_blank" rel="noopener">view action.yml</a>
+        <a href="https://github.com/ivnovomi/nyxor/blob/main/action.yml" class="btn btn-solid reveal" target="_blank" rel="noopener">View action.yml</a>
       </div>
       <div class="term reveal">
         <div class="term-bar"><span class="term-title">.github/workflows/audit.yml</span><div class="term-dots"><span></span><span></span><span></span></div></div>
@@ -158,7 +182,7 @@
   <section id="pricing" class="section">
     <div class="wrap">
       <div class="sec-head">
-        <p class="sec-num reveal">05 / pricing</p>
+        <p class="sec-num reveal">05 — Pricing</p>
         <h2 class="reveal">Run it yourself, or let us run it</h2>
         <p class="sec-sub reveal">The core is MIT licensed and free forever. Cloud is the managed version of the same engine.</p>
       </div>
@@ -167,7 +191,7 @@
           <p class="price-tier">free</p>
           <p class="price-num">$0<span class="price-period">/forever</span></p>
           <p class="price-desc">Self-hosted. You run it, you own the data.</p>
-          <a href="#install" class="btn btn-block price-btn">get started</a>
+          <a href="#install" class="btn btn-block price-btn">Get started</a>
           <ul class="price-feats">
             <li>CLI, TUI, REST API, NyxScript — MIT licensed</li>
             <li>Unlimited domains, your own infrastructure</li>
@@ -179,7 +203,7 @@
           <p class="price-tier">cloud <span class="price-tag">popular</span></p>
           <p class="price-num">$19<span class="price-period">/mo</span></p>
           <p class="price-desc">Managed. Point it at a domain list and forget it.</p>
-          <a href="mailto:idimnovdie1602@protonmail.com?subject=NYXOR%20Cloud%20waitlist" class="btn btn-solid btn-block price-btn">join the waitlist</a>
+          <a href="mailto:idimnovdie1602@protonmail.com?subject=NYXOR%20Cloud%20waitlist" class="btn btn-solid btn-block price-btn">Join the waitlist</a>
           <ul class="price-feats">
             <li>Up to 10 domains, hosted scheduling</li>
             <li>Hosted dashboard, grade history and trends</li>
@@ -192,7 +216,7 @@
           <p class="price-tier">scale</p>
           <p class="price-num">custom</p>
           <p class="price-desc">Fleets of domains, teams, audit trails.</p>
-          <a href="mailto:idimnovdie1602@protonmail.com?subject=NYXOR%20Scale%20inquiry" class="btn btn-block price-btn">talk to us</a>
+          <a href="mailto:idimnovdie1602@protonmail.com?subject=NYXOR%20Scale%20inquiry" class="btn btn-block price-btn">Talk to us</a>
           <ul class="price-feats">
             <li>Unlimited domains and team seats</li>
             <li>SSO and a full audit log</li>
@@ -208,7 +232,7 @@
   <section id="faq" class="section">
     <div class="wrap">
       <div class="sec-head">
-        <p class="sec-num reveal">06 / faq</p>
+        <p class="sec-num reveal">06 — FAQ</p>
         <h2 class="reveal">Questions worth answering up front</h2>
       </div>
       <div class="faq reveal">
@@ -238,7 +262,7 @@
 
   <section id="install" class="section final-cta">
     <div class="wrap">
-      <p class="sec-num reveal">07 / install</p>
+      <p class="sec-num reveal">07 — Install</p>
       <h2 class="reveal">Start free. Upgrade when YAML gets old.</h2>
       <div class="term final-term reveal">
         <div class="term-bar"><span class="term-title">shell</span><div class="term-dots"><span></span><span></span><span></span></div></div>
@@ -247,8 +271,8 @@
       </div>
       <p class="sec-sub reveal">Requires Python 3.13+ and <a href="https://docs.astral.sh/uv/" target="_blank" rel="noopener" style="color:var(--green)">uv</a>. Installs from source — no PyPI publish required.</p>
       <div class="final-cta-row reveal">
-        <a href="https://github.com/ivnovomi/nyxor" class="btn btn-lg" target="_blank" rel="noopener">star on github</a>
-        <a href="mailto:idimnovdie1602@protonmail.com?subject=NYXOR%20Cloud%20waitlist" class="btn btn-solid btn-lg">join the cloud waitlist</a>
+        <a href="https://github.com/ivnovomi/nyxor" class="btn btn-lg" target="_blank" rel="noopener">Star on GitHub</a>
+        <a href="mailto:idimnovdie1602@protonmail.com?subject=NYXOR%20Cloud%20waitlist" class="btn btn-solid btn-lg">Join the Cloud waitlist</a>
       </div>
     </div>
   </section>
@@ -257,7 +281,7 @@
 
 <footer class="footer">
   <div class="wrap footer-inner">
-    <a href="#top" class="brand"><span class="brand-dot" aria-hidden="true"></span>NYXOR</a>
+    <a href="#top" class="brand"><svg viewBox="0 0 24 24" class="brand-mark" aria-hidden="true"><path d="M4 6L10 12L4 18" stroke="currentColor" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><line x1="13" y1="18" x2="20" y2="18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>NYXOR</a>
     <p class="footer-tag">MIT licensed. Not a hacking framework. Cloud pricing above is a proposal, not a live checkout.</p>
     <div class="footer-links">
       <a href="https://github.com/ivnovomi/nyxor" target="_blank" rel="noopener">github</a>
