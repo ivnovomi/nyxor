@@ -1,0 +1,90 @@
+name: NYXOR Audit
+description: >-
+  Run a NYXOR security audit (DNS + TLS + HTTP, SSL-Labs-style letter grade)
+  against a domain, entirely on GitHub-hosted runners. No server, no PyPI
+  publish, no account to sign up for.
+author: ivnovomi
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  target:
+    description: Domain to audit (e.g. example.com)
+    required: true
+  report-path:
+    description: >-
+      Path to write the report to. Format is inferred from the extension
+      (.json, .md, .html). Leave empty to skip writing a report.
+    required: false
+    default: nyxor-report.html
+  badge-path:
+    description: Path to write the SVG grade badge to. Leave empty to skip.
+    required: false
+    default: nyxor-badge.svg
+  unsafe:
+    description: Allow NyxScript's python:/pip escape hatches (not used by this action itself).
+    required: false
+    default: "false"
+  nyxor-ref:
+    description: Git ref of ivnovomi/nyxor to install (branch, tag, or commit).
+    required: false
+    default: main
+
+outputs:
+  grade:
+    description: Letter grade (A+ down to F).
+    value: ${{ steps.audit.outputs.grade }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+
+    - name: Run audit
+      id: audit
+      shell: bash
+      env:
+        NYXOR_TARGET: ${{ inputs.target }}
+        NYXOR_REPORT_PATH: ${{ inputs.report-path }}
+        NYXOR_BADGE_PATH: ${{ inputs.badge-path }}
+        NYXOR_REF: ${{ inputs.nyxor-ref }}
+      run: |
+        set -euo pipefail
+
+        # Values above arrive via env: (not spliced into this script by
+        # ${{ }} expansion) so they're treated as inert data by bash, not
+        # as script text — a target/ref containing `$(...)` or backticks
+        # can't break out and run arbitrary commands on the runner.
+
+        args=(nyx)
+        if [ -n "$NYXOR_REPORT_PATH" ]; then
+          args+=(--output "$NYXOR_REPORT_PATH")
+        fi
+        args+=(audit "$NYXOR_TARGET")
+        if [ -n "$NYXOR_BADGE_PATH" ]; then
+          args+=(--badge "$NYXOR_BADGE_PATH")
+        fi
+
+        uv tool run --python 3.13 \
+          --from "nyxor @ git+https://github.com/ivnovomi/nyxor@${NYXOR_REF}" \
+          "${args[@]}" | tee nyxor-audit.log
+
+        # Rich may wrap the "(grade X)" line across two lines in a narrow
+        # terminal — join everything before matching so the grade is found
+        # regardless of wrapping.
+        grade=$(tr '\n' ' ' < nyxor-audit.log | grep -oP '(?<=grade )[A-Za-z+-]+(?=\))' | tail -1 || true)
+        if [ -z "$grade" ]; then
+          echo "::warning::Could not parse a grade from nyx audit's output."
+          grade="unknown"
+        fi
+        echo "grade=$grade" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "### NYXOR audit — $NYXOR_TARGET"
+          echo ""
+          echo "Grade: **$grade**"
+        } >> "$GITHUB_STEP_SUMMARY"
