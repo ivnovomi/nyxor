@@ -5,11 +5,16 @@
   "patterns": [
     { "include": "#python-block" },
     { "include": "#comments" },
+    { "include": "#docstring" },
     { "include": "#strings" },
     { "include": "#numbers" },
     { "include": "#booleans" },
+    { "include": "#function-def" },
     { "include": "#keywords" },
+    { "include": "#ui-functions" },
     { "include": "#modules" },
+    { "include": "#builtin-functions" },
+    { "include": "#function-call" },
     { "include": "#operators" }
   ],
   "repository": {
@@ -35,6 +40,13 @@
         }
       ]
     },
+    "docstring": {
+      "comment": "A line whose entire content is a string literal — by convention the first statement in a `func` body.",
+      "match": "^(\\s*)(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')(\\s*)$",
+      "captures": {
+        "2": { "name": "comment.block.documentation.nyxscript" }
+      }
+    },
     "strings": {
       "patterns": [
         {
@@ -54,6 +66,9 @@
                 { "include": "#numbers" },
                 { "include": "#booleans" },
                 { "include": "#keywords" },
+                { "include": "#ui-functions" },
+                { "include": "#builtin-functions" },
+                { "include": "#function-call" },
                 { "include": "#operators" },
                 { "match": "[A-Za-z_][A-Za-z0-9_]*", "name": "variable.other.nyxscript" }
               ]
@@ -79,12 +94,31 @@
       "name": "constant.language.boolean.nyxscript"
     },
     "keywords": {
-      "match": "\\b(set|if|else|end|foreach|in|run|as|to|save|print|sleep|assert|fail|pip|and|or|not)\\b",
+      "match": "\\b(set|if|else|end|foreach|while|break|continue|func|return|import|in|run|as|to|save|print|sleep|assert|fail|pip|and|or|not)\\b",
       "name": "keyword.control.nyxscript"
+    },
+    "function-def": {
+      "match": "\\b(func)\\s+([A-Za-z_][A-Za-z0-9_]*)\\b",
+      "captures": {
+        "1": { "name": "keyword.control.nyxscript" },
+        "2": { "name": "entity.name.function.nyxscript" }
+      }
     },
     "modules": {
       "match": "\\b(audit|dns|tls|http|network\\.discover|network\\.scan)\\b",
       "name": "support.function.nyxscript"
+    },
+    "ui-functions": {
+      "match": "\\b(ui)\\.(confirm|input|select|table|banner|status)\\b",
+      "name": "support.function.builtin.nyxscript"
+    },
+    "builtin-functions": {
+      "match": "\\b(len|range|upper|lower|strip|split|join|contains|str|int|float|abs|round|sorted|reversed|min|max|sum|type_of)\\b(?=\\s*\\()",
+      "name": "support.function.builtin.nyxscript"
+    },
+    "function-call": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)\\b(?=\\s*\\()",
+      "name": "entity.name.function.nyxscript"
     },
     "operators": {
       "match": "(==|!=|<=|>=|<|>|=|\\+|-|\\*|/)",

@@ -6,16 +6,31 @@ Syntax highlighting, diagnostics, and completion for `.nyx` files —
 
 ## Features
 
-- Syntax highlighting for keywords, module names, strings (with
+- Syntax highlighting for keywords (including `func`/`return`/`while`/
+  `break`/`continue`/`import`), function definitions and calls
+  (`square(4)`, `math.square(4)`, `ui.confirm(...)`), built-in functions
+  (`len`, `range`, `upper`, `join`, ...), module names, docstrings
+  (highlighted separately from ordinary strings), strings (with
   `{interpolation}` highlighted inside), numbers, booleans, operators, and
   `python: ... end` blocks (highlighted as embedded Python).
-- Real-time diagnostics: undefined variables, unknown `run` modules (with
-  "did you mean" suggestions), empty control-flow bodies — powered by
+- Real-time diagnostics: undefined variables, unknown `run` modules and
+  unknown function calls (both with "did you mean" suggestions), stray
+  `break`/`continue`/`return`, empty control-flow bodies — powered by
   NyxScript's own static linter, running over the Language Server Protocol.
-- Completion for keywords, module names, and variables already `set` in
-  the open file.
-- Comment toggling (`#`), bracket/quote auto-closing, and `if`/`foreach`/
-  `python` block indentation.
+- Completion for keywords, module names, built-in functions, `ui.*`
+  functions, and variables already `set` in the open file — plus **import
+  path completion**: type `import "` and get every `.nyx` file in the
+  workspace, path relative to the workspace root (the file you're editing
+  is excluded).
+- **Hover** shows the signature and [docstring](../../docs/nyxscript.md#docstrings)
+  of any function you point at — including calls through an import alias
+  (`math.square(4)` shows `square`'s docstring from wherever `math` was
+  imported from).
+- **Go to Definition** (F12 / Ctrl-click) on a function call jumps straight
+  to its `func` line, in the current file or an imported library.
+- Comment toggling (`#`), bracket/quote auto-closing, and
+  `if`/`foreach`/`while`/`func`/`python` block indentation (indent after a
+  line ending in `:`, outdent on `end`/`else`).
 
 ## Requirements
 
