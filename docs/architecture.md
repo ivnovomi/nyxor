@@ -1,11 +1,11 @@
 # Architecture
 
-Three front-ends — a CLI, a full-screen TUI, and a Language Server any
-editor can talk to — and every single one of them calls the *same* async
-functions to do real work. Nothing is reimplemented twice. That single
-decision is what makes the rest of this document short: once you understand
-the Core/plugin split and the "one scan, two front-ends" pattern below,
-you've understood most of how NYXOR is put together.
+Four front-ends — a CLI, a full-screen TUI, a REST API, and a Language
+Server any editor can talk to — and every single one of them calls the
+*same* async functions to do real work. Nothing is reimplemented twice.
+That single decision is what makes the rest of this document short: once
+you understand the Core/plugin split and the "one scan, N front-ends"
+pattern below, you've understood most of how NYXOR is put together.
 
 ## Layout
 
@@ -15,7 +15,8 @@ src/nyxor/
     reporting/     # ReportDocument + JSON/Markdown/HTML writers
     scripting/     # NyxScript: lexer, parser, AST, interpreter, linter
   lsp/             # NyxScript Language Server (pygls)
-  plugins/         # every feature area — network, dns, tls, http, audit, watch, script, tui, ...
+  api/             # the REST API (FastAPI) — a fourth front-end over run_*
+  plugins/         # every feature area — network, dns, tls, http, audit, watch, script, tui, serve, ...
 editors/
   vscode-nyxscript/  # the VS Code extension (syntax highlighting + LSP client)
 tests/
@@ -91,7 +92,7 @@ Each command function should instead accept `ctx: typer.Context` and read
 `main_callback` after argv is parsed. See any existing plugin's
 `plugin.py` for the pattern.
 
-## One scan, three front-ends
+## One scan, N front-ends
 
 Every domain plugin (`network`, `dns`, `tls`, `http`, `audit`) splits its
 logic into an `async def run_*(...) -> ModuleResult` function and a thin
@@ -104,13 +105,17 @@ coroutines instead of talking to the network again:
 - **NyxScript**: `core/scripting/stdlib.py`'s `MODULE_RUNNERS` maps
   `run audit example.com` in a `.nyx` script to `run_audit(...)` — the
   exact function the CLI and TUI use.
+- **REST API**: `api/app.py`'s `GET /dns/{domain}` handler is a two-line
+  wrapper around `run_lookup(...)`, returning the `ModuleResult` Pydantic
+  model directly — FastAPI serializes it, nothing is re-shaped for HTTP.
 - **`nyx watch`**: reruns `run_audit(...)` on an interval and diffs the
   resulting findings against the previous run.
 
-Four surfaces, one implementation. This is why `nyx dns lookup
-example.com`, running "DNS — lookup" from `nyx tui`, and `run dns
-example.com` from a NyxScript file produce *identical* findings — they're
-the same code path, rendered four different ways.
+One implementation, five surfaces. This is why `nyx dns lookup
+example.com`, running "DNS — lookup" from `nyx tui`, `run dns
+example.com` from a NyxScript file, and `curl .../dns/example.com` all
+produce *identical* findings — they're the same code path, rendered
+differently at the very last step.
 
 When adding a new module, follow this split from the start: keep the async
 logic free of Typer/Textual/NyxScript imports, and let each front-end
@@ -149,7 +154,7 @@ Three consumers sit on top of that pipeline without touching its internals:
 ## Future expansion points
 
 The interfaces are deliberately narrow so these can be added without
-Core changes: a REST API and web dashboard consuming the same
-`ModuleResult`/`ReportDocument` models, a database-backed `InventoryStore`
-implementation, remote/distributed scanning agents publishing over the
-same event names, and scheduling.
+Core changes: a web dashboard consuming the REST API (`api/app.py`) that
+already exists, a database-backed `InventoryStore` implementation,
+remote/distributed scanning agents publishing over the same event names,
+authentication on the API, and scheduling.
