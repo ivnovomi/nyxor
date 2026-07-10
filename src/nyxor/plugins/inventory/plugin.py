@@ -53,6 +53,12 @@ class InventoryPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the inventory command group with the CLI application.
+        
+        Parameters:
+        	app (typer.Typer): The CLI application to extend.
+        	context (NyxorContext): The shared application context.
+        """
         app.add_typer(inventory_app, rich_help_panel=self.metadata.category)
 
 

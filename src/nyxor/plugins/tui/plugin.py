@@ -26,6 +26,7 @@ class TuiPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the TUI command with the application."""
         app.command("tui", rich_help_panel=self.metadata.category)(_tui)
 
 

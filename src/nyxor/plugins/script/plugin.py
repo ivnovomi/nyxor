@@ -220,6 +220,12 @@ class ScriptPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the script command group with the application.
+        
+        Parameters:
+        	app (typer.Typer): The application to which the command group is added.
+        	context (NyxorContext): The host application context.
+        """
         app.add_typer(script_app, rich_help_panel=self.metadata.category)
 
 

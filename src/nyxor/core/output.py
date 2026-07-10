@@ -58,6 +58,12 @@ def emit_results(context: NyxorContext, results: list[ModuleResult], *, title: s
 
 
 def _print_table(console: Console, results: list[ModuleResult]) -> None:
+    """
+    Render module results as Rich-formatted terminal tables.
+    
+    Parameters:
+        results (list[ModuleResult]): Module results containing errors and findings to display.
+    """
     for result in results:
         console.rule(f"{result.module} — {result.target}")
         for err in result.errors:

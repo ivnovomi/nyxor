@@ -81,6 +81,12 @@ class ConfigPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the configuration command group with the application.
+        
+        Parameters:
+        	app (typer.Typer): The Typer application to extend.
+        	context (NyxorContext): The active NYXOR application context.
+        """
         app.add_typer(config_app, rich_help_panel=self.metadata.category)
 
 

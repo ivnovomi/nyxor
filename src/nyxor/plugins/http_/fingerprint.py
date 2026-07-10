@@ -83,6 +83,16 @@ _META_GENERATOR_RE = re.compile(
 def _header_matches(
     lower_headers: dict[str, str], signatures: tuple[tuple[str, str | None, str], ...]
 ) -> list[str]:
+    """
+    Identify names associated with matching HTTP header signatures.
+    
+    Parameters:
+        lower_headers (dict[str, str]): Header names mapped to their values.
+        signatures (tuple[tuple[str, str | None, str], ...]): Header signatures containing a header name, an optional value substring, and the associated name.
+    
+    Returns:
+        list[str]: Names whose header signatures match the provided headers.
+    """
     found: list[str] = []
     for header, needle, name in signatures:
         value = lower_headers.get(header)
@@ -96,11 +106,16 @@ def _header_matches(
 def fingerprint(
     headers: dict[str, str], cookies: list[dict[str, Any]], body: str
 ) -> dict[str, list[str]]:
-    """Passively identify likely technologies and CDN/WAF providers.
-
-    ``headers`` should already be the raw (not lower-cased) response
-    headers; ``body`` is the response text (an empty string is fine — body
-    signatures just won't match anything).
+    """
+    Passively identify technologies and CDN/WAF providers from HTTP response data.
+    
+    Parameters:
+        headers (dict[str, str]): Raw response headers.
+        cookies (list[dict[str, Any]]): Response cookie dictionaries.
+        body (str): Response body text.
+    
+    Returns:
+        dict[str, list[str]]: Sorted detected technology names under `"technologies"` and CDN/WAF provider names under `"cdn_waf"`.
     """
     lower_headers = {k.lower(): v for k, v in headers.items()}
     lower_body = body.lower()

@@ -165,6 +165,7 @@ class AuthPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the authentication command group with the Typer application."""
         app.add_typer(auth_app, rich_help_panel=self.metadata.category)
 
 

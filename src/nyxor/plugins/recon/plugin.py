@@ -102,6 +102,14 @@ async def run_recon(
 
 
 def _print_summary(context: NyxorContext, domain: str, results: list[ModuleResult]) -> None:
+    """
+    Display a table summarizing discovered subdomains and their resolution status.
+    
+    Parameters:
+    	context (NyxorContext): Application context containing the console used for output.
+    	domain (str): Domain associated with the reconnaissance results.
+    	results (list[ModuleResult]): Reconnaissance results containing subdomain findings.
+    """
     result = results[0]
     live_count = sum(1 for f in result.findings if f.evidence.get("live") is True)
     table = Table(
@@ -151,6 +159,12 @@ class ReconPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the recon command with the Typer application.
+        
+        Parameters:
+            app (typer.Typer): The application on which to register the command.
+            context (NyxorContext): The plugin execution context.
+        """
         app.command("recon", rich_help_panel=self.metadata.category)(_recon)
 
 

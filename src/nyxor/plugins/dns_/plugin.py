@@ -115,6 +115,12 @@ class DnsPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the DNS command group with the application.
+        
+        Parameters:
+        	app (typer.Typer): The Typer application that receives the DNS commands.
+        	context (NyxorContext): The application context.
+        """
         app.add_typer(dns_app, rich_help_panel=self.metadata.category)
 
 

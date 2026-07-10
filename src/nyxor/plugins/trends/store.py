@@ -50,16 +50,39 @@ class TrendStore:
         self._save(data)
 
     def history(self, domain: str, limit: int | None = None) -> list[Sample]:
+        """
+        Retrieve the recorded samples for a domain.
+        
+        Parameters:
+        	domain (str): The domain whose history to retrieve.
+        	limit (int | None): The maximum number of most recent samples to return. Values less than or equal to zero return the full history.
+        
+        Returns:
+        	list[Sample]: The domain's recorded samples, limited to the most recent entries when applicable.
+        """
         samples = self._load().get(domain, [])
         if limit is not None and limit > 0:
             samples = samples[-limit:]
         return samples
 
     def all_domains(self) -> dict[str, list[Sample]]:
-        """Every domain's recorded history — for tools that summarize across all of them."""
+        """
+        Return the recorded history for every domain.
+        
+        Returns:
+        	dict[str, list[Sample]]: A mapping of domain names to their recorded samples.
+        """
         return self._load()
 
     def clear(self, domain: str) -> bool:
+        """Remove all stored samples for a domain.
+        
+        Parameters:
+            domain (str): The domain whose history should be removed.
+        
+        Returns:
+            bool: `true` if the domain was found and removed, `false` otherwise.
+        """
         data = self._load()
         if domain not in data:
             return False

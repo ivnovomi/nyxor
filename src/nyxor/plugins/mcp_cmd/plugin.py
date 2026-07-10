@@ -44,6 +44,12 @@ class McpPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the MCP server command with the Typer application.
+        
+        Parameters:
+        	app (typer.Typer): CLI application to which the command is added.
+        	context (NyxorContext): Shared NYXOR execution context passed to the command.
+        """
         app.command("mcp", rich_help_panel=self.metadata.category)(_mcp)
 
 

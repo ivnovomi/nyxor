@@ -72,6 +72,12 @@ class PluginManagementPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the plugin management commands with the host application.
+        
+        Parameters:
+        	app (typer.Typer): The host Typer application.
+        	context (NyxorContext): The Nyxor runtime context.
+        """
         app.add_typer(plugin_app, rich_help_panel=self.metadata.category)
 
 

@@ -56,6 +56,12 @@ class UpdatePlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the update command with the Typer application under the plugin's help category.
+        
+        Parameters:
+            app (typer.Typer): The application to which the command is added.
+            context (NyxorContext): Application context reserved for command registration.
+        """
         app.command("update", rich_help_panel=self.metadata.category)(_update)
 
 

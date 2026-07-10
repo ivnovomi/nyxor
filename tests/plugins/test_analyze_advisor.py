@@ -8,6 +8,7 @@ from nyxor.plugins.analyze.ollama import OllamaUnavailable
 
 
 def _result(module: str, *severities: Severity) -> ModuleResult:
+    """Construct a module result for the fixed example target with one finding per severity."""
     return ModuleResult(
         module=module,
         target="example.com",
@@ -19,12 +20,33 @@ def _result(module: str, *severities: Severity) -> ModuleResult:
 
 
 async def _fake_generate_ok(prompt: str, *, host: str, model: str, timeout_seconds: float) -> str:
+    """
+    Return a response containing the length of the provided prompt.
+    
+    Parameters:
+    	prompt (str): The prompt whose length is included in the response.
+    	host (str): Model server host.
+    	model (str): Model identifier.
+    	timeout_seconds (float): Request timeout in seconds.
+    
+    Returns:
+    	str: A message containing the prompt length.
+    """
     return f"model saw prompt of length {len(prompt)}"
 
 
 async def _fake_generate_fails(
     prompt: str, *, host: str, model: str, timeout_seconds: float
 ) -> str:
+    """
+    Raise OllamaUnavailable to simulate an unreachable model server.
+    
+    Parameters:
+        prompt (str): The generated prompt.
+        host (str): The model server host.
+        model (str): The model name.
+        timeout_seconds (float): The request timeout.
+    """
     raise OllamaUnavailable("no model server reachable")
 
 

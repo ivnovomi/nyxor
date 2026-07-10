@@ -65,6 +65,11 @@ class ScriptUI:
         )
 
     async def table(self, args: list[Any]) -> None:
+        """Display tabular data with headers and rows.
+        
+        Parameters:
+            args (list[Any]): A two-item list containing the header list and row list.
+        """
         if len(args) != 2:
             raise TypeError("ui.table() expects 2 arguments (headers, rows)")
         headers, rows = args
@@ -83,11 +88,23 @@ class ScriptUI:
         self.console.print(table)
 
     async def banner(self, args: list[Any]) -> None:
+        """
+        Display a styled rule containing the specified banner text.
+        
+        Parameters:
+        	args (list[Any]): A single-item list containing the banner text.
+        """
         if len(args) != 1:
             raise TypeError("ui.banner() expects 1 argument (text)")
         self.console.rule(f"[bold]{escape_markup(str(args[0]))}[/bold]")
 
     async def status(self, args: list[Any]) -> None:
+        """
+        Display a dim status message.
+        
+        Parameters:
+        	args (list[Any]): A single-item list containing the message to display.
+        """
         if len(args) != 1:
             raise TypeError("ui.status() expects 1 argument (message)")
         self.console.print(f"[dim]…[/dim] {escape_markup(str(args[0]))}")

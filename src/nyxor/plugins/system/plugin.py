@@ -28,6 +28,7 @@ class SystemPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the system plugin's diagnostic command with the Typer application."""
         app.command("doctor", rich_help_panel=self.metadata.category)(_doctor)
 
 

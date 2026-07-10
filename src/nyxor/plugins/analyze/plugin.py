@@ -85,6 +85,12 @@ class AnalyzePlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the analyze command with the Typer application.
+        
+        Parameters:
+        	app (typer.Typer): The application to which the command is added.
+        	context (NyxorContext): The plugin execution context.
+        """
         app.command("analyze", rich_help_panel=self.metadata.category)(_analyze)
 
 

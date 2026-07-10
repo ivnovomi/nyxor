@@ -32,6 +32,18 @@ def _describe_cookie(cookie: Any) -> dict[str, Any]:
 async def inspect(
     url: str, timeout: float, follow_redirects: bool, max_redirects: int
 ) -> dict[str, Any]:
+    """
+    Inspect a URL and collect response metadata, redirect information, cookies, security header gaps, and fingerprints.
+    
+    Parameters:
+    	url (str): URL to request.
+    	timeout (float): Maximum time allowed for the HTTP request.
+    	follow_redirects (bool): Whether to follow redirects.
+    	max_redirects (int): Maximum number of redirects to follow.
+    
+    Returns:
+    	dict[str, Any]: Response details including the final URL, status code, headers, redirect chain, cookies, missing security headers, detected technologies, and CDN/WAF fingerprints.
+    """
     redirect_chain: list[dict[str, Any]] = []
 
     async with httpx.AsyncClient(

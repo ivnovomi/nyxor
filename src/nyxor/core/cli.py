@@ -54,9 +54,14 @@ _CATEGORY_PRIORITY = (
 
 
 def _category_sort_key(category: str) -> int:
-    """Where ``category`` falls in :data:`_CATEGORY_PRIORITY` — unlisted
-
-    categories (a third-party plugin's own name) sort after all of these.
+    """
+    Determine the display priority for a plugin category.
+    
+    Parameters:
+        category (str): Plugin category to prioritize.
+    
+    Returns:
+        int: The category's position in `_CATEGORY_PRIORITY`, or the length of that sequence when unlisted.
     """
     if category in _CATEGORY_PRIORITY:
         return _CATEGORY_PRIORITY.index(category)

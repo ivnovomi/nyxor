@@ -7,6 +7,11 @@ from nyxor.core.output import _print_table
 
 
 def _bracketed_finding() -> Finding:
+    """Create a finding containing bracketed text for markup-safety testing.
+    
+    Returns:
+        Finding: A sample informational finding with literal bracketed content.
+    """
     return Finding(
         title="Banner: [admin]",
         severity=Severity.INFO,

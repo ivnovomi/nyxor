@@ -65,6 +65,16 @@ Question: {question}
 
 
 def _findings_block(results: list[ModuleResult], *, min_severity: Severity | None = None) -> str:
+    """
+    Format findings as a newline-separated text block.
+    
+    Parameters:
+    	results (list[ModuleResult]): Module results containing the findings to format.
+    	min_severity (Severity | None): Minimum severity to include. Findings below this severity are omitted.
+    
+    Returns:
+    	str: Formatted finding lines, or "(none)" when no findings meet the severity threshold.
+    """
     lines = []
     for result in results:
         for finding in result.findings:
@@ -87,10 +97,15 @@ async def dumber_writeup(
     model: str,
     timeout_seconds: float,
 ) -> str | None:
-    """A model-written, beginner-friendly walkthrough of every finding, or
-
-    ``None`` if no local model answered — callers should fall back to the
-    templated :func:`nyxor.core.explain.explain` in that case.
+    """
+    Generate a beginner-friendly walkthrough of all findings for a domain.
+    
+    Parameters:
+    	domain (str): The domain associated with the findings.
+    	results (list[ModuleResult]): The module results containing findings.
+    
+    Returns:
+    	str | None: The generated walkthrough, or `None` if the local model is unavailable.
     """
     prompt = _DUMBER_PROMPT.format(domain=domain, findings=_findings_block(results))
     try:
@@ -106,9 +121,15 @@ async def fix_suggestions(
     model: str,
     timeout_seconds: float,
 ) -> str | None:
-    """Remediation steps for medium-or-worse findings, or ``None`` if there
-
-    are none to fix, or no local model answered.
+    """
+    Generate remediation guidance for findings with medium severity or higher.
+    
+    Parameters:
+        results (list[ModuleResult]): Scan results containing findings to address.
+    
+    Returns:
+        str | None: Generated remediation guidance, or `None` when no eligible
+            findings exist or the local model is unavailable.
     """
     block = _findings_block(results, min_severity=Severity.MEDIUM)
     if block == "(none)":
@@ -131,9 +152,18 @@ async def watch_narration(
     model: str,
     timeout_seconds: float,
 ) -> str | None:
-    """One narrated sentence about what changed, or ``None`` if nothing
-
-    changed or no local model answered.
+    """
+    Describe changes in a website's security posture in one short sentence.
+    
+    Parameters:
+        domain (str): Website whose security posture changed.
+        grade (str): Current security grade.
+        previous_grade (str): Security grade from the previous scan.
+        new (list[tuple[str, str, str]]): Findings introduced since the previous scan.
+        resolved (list[tuple[str, str, str]]): Findings resolved since the previous scan.
+    
+    Returns:
+        str | None: A generated narration, or `None` when nothing changed or the local model is unavailable.
     """
     if not new and not resolved and grade == previous_grade:
         return None
@@ -151,6 +181,15 @@ async def watch_narration(
 
 
 def _history_block(history: dict[str, list[Sample]]) -> str:
+    """
+    Serialize scan history into a text block for assistant prompts.
+    
+    Parameters:
+        history (dict[str, list[Sample]]): Recorded samples grouped by domain.
+    
+    Returns:
+        str: A newline-separated history block, or a message indicating that no history is recorded.
+    """
     if not history:
         return "(no recorded history — run `nyx audit`/`nyx trends` a few times first)"
     lines = []
@@ -168,11 +207,15 @@ async def ask(
     model: str,
     timeout_seconds: float,
 ) -> str:
-    """Answer a free-form question about recorded scan history.
-
-    Raises :class:`OllamaUnavailable` rather than returning ``None`` — unlike
-    the other helpers here, `nyx ask` has nothing sensible to fall back to
-    without a model, so the caller should report the error directly.
+    """
+    Answer a question using recorded scan history.
+    
+    Parameters:
+        question (str): The question to answer.
+        history (dict[str, list[Sample]]): Recorded scan samples grouped by domain.
+    
+    Returns:
+        str: The model-generated answer.
     """
     prompt = _ASK_PROMPT.format(history=_history_block(history), question=question)
     return await generate(prompt, host=host, model=model, timeout_seconds=timeout_seconds)

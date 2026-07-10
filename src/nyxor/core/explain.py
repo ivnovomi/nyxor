@@ -138,10 +138,20 @@ def _compression(f: Finding) -> str:
 
 
 def _dns_record(f: Finding) -> str:
+    """Explain that a DNS record is routine bookkeeping rather than an inherent security issue."""
     return f"{f.description} — routine DNS bookkeeping, not a security finding by itself."
 
 
 def _detected_technology(f: Finding) -> str:
+    """
+    Explain a technology identified through passive fingerprinting.
+    
+    Parameters:
+        f (Finding): Finding whose description identifies the detected technology.
+    
+    Returns:
+        str: An explanation that the technology was inferred from response headers, cookie names, and page markup, and may not be certain.
+    """
     return (
         f"Passive fingerprinting picked up: {f.description}. Read from response headers, "
         "cookie names, and page markup — nothing was probed or guessed at, so treat it as "
@@ -150,6 +160,7 @@ def _detected_technology(f: Finding) -> str:
 
 
 def _cdn_waf(f: Finding) -> str:
+    """Explain that site traffic passes through a service that can cache content and filter malicious requests."""
     return (
         f"Traffic to this site passes through: {f.description}. That's the service sitting "
         "in front of the real server, caching content and often filtering out obviously "

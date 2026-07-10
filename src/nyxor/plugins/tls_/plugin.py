@@ -24,6 +24,15 @@ def _parse_target(target: str) -> tuple[str, int]:
     # A full URL (nyx audit accepts one, same as http.inspect) — pull the
     # host/port back out instead of treating "https" as the hostname and
     # "//example.com/" as the port.
+    """
+    Parse a user-supplied target into a hostname and port.
+    
+    Parameters:
+        target (str): URL, hostname, host-port pair, or IPv6 address.
+    
+    Returns:
+        tuple[str, int]: The hostname and port, defaulting to port 443 when no valid port is provided.
+    """
     if "://" in target:
         parsed = urlsplit(target)
         if parsed.hostname:
@@ -149,6 +158,12 @@ class TlsPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the TLS command group with the application.
+        
+        Parameters:
+        	app (typer.Typer): The application to which the TLS commands are added.
+        	context (NyxorContext): The plugin execution context.
+        """
         app.add_typer(tls_app, rich_help_panel=self.metadata.category)
 
 

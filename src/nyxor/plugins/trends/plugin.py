@@ -33,7 +33,18 @@ def show(
     ),
     limit: int = typer.Option(30, "--limit", help="Number of most recent runs to consider."),
 ) -> None:
-    """Audit a domain, record its score, and report the trend."""
+    """
+    Audit a domain, optionally record its score, and report its score trend.
+    
+    Parameters:
+        ctx (typer.Context): Typer context containing the application configuration.
+        domain (str): Domain to audit and report on.
+        no_record (bool): Whether to report existing history without running a new audit.
+        limit (int): Maximum number of recent runs to include.
+    
+    Raises:
+        typer.Exit: If no history exists for the domain.
+    """
     context: NyxorContext = ctx.obj
     store = TrendStore()
 
@@ -102,6 +113,12 @@ class TrendsPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the trends command group with the application.
+        
+        Parameters:
+            app (typer.Typer): The application that receives the trends commands.
+            context (NyxorContext): The application context.
+        """
         app.add_typer(trends_app, rich_help_panel=self.metadata.category)
 
 

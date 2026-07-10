@@ -23,6 +23,15 @@ from nyxor.plugins.trends.store import TrendStore
 
 
 async def _ask_once(context: NyxorContext, question: str, *, host: str, model: str) -> None:
+    """
+    Ask the local model a question using the recorded scan history.
+    
+    Parameters:
+        context (NyxorContext): Application context containing AI configuration and console output.
+        question (str): Question to send to the model.
+        host (str): Ollama server host.
+        model (str): Model name to use.
+    """
     ai_config = context.config.ai
     history = TrendStore().all_domains()
     try:
@@ -40,6 +49,14 @@ async def _ask_once(context: NyxorContext, question: str, *, host: str, model: s
 
 
 async def _ask_repl(context: NyxorContext, *, host: str, model: str) -> None:
+    """
+    Run an interactive session for asking questions about recorded scan history.
+    
+    Parameters:
+        context (NyxorContext): Command context providing console access and scan history.
+        host (str): Ollama server host.
+        model (str): Local model to query.
+    """
     console = context.console
     console.print(
         f"[dim]nyx ask — chatting with local model '{model}' about your recorded scan "
@@ -93,6 +110,7 @@ class AskPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the ``ask`` command with the Typer application."""
         app.command("ask", rich_help_panel=self.metadata.category)(_ask)
 
 

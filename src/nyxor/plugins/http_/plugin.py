@@ -21,7 +21,16 @@ http_app = typer.Typer(
 
 
 async def run_inspect(url: str, config: HttpConfig) -> ModuleResult:
-    """Inspect the HTTP response for a URL and return a ModuleResult."""
+    """
+    Inspect an HTTP response and collect status, redirect, technology, cookie, and security findings.
+    
+    Parameters:
+        url (str): URL to inspect; URLs without a scheme are treated as HTTPS.
+        config (HttpConfig): HTTP inspection settings.
+    
+    Returns:
+        ModuleResult: Inspection findings, raw response data, and any errors encountered.
+    """
     if not url.startswith(("http://", "https://")):
         url = f"https://{url}"
 
@@ -157,6 +166,13 @@ class HttpPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """
+        Register the HTTP command group with the application.
+        
+        Parameters:
+        	app (typer.Typer): The Typer application that receives the command group.
+        	context (NyxorContext): The plugin execution context.
+        """
         app.add_typer(http_app, rich_help_panel=self.metadata.category)
 
 

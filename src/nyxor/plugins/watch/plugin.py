@@ -30,6 +30,15 @@ Fingerprint = tuple[str, str, str]
 async def _watch_loop(
     domain: str, context: NyxorContext, interval: float, iterations: int, *, narrate: bool
 ) -> None:
+    """
+    Continuously audits a domain and reports finding and grade changes.
+    
+    Parameters:
+        domain (str): Domain to monitor.
+        interval (float): Seconds to wait between checks.
+        iterations (int): Number of checks to perform; zero runs continuously.
+        narrate (bool): Whether to generate narration for detected changes.
+    """
     console = context.console
     console.print(
         f"[bold #7ee7e1]Watching[/] {escape_markup(domain)} every {interval:.0f}s "
@@ -117,7 +126,18 @@ def _watch(
         help="On a change, ask a local model for a one-line plain-English narration.",
     ),
 ) -> None:
-    """Continuously audit a domain and report only what changes."""
+    """
+    Continuously audit a domain and report only changes between checks.
+    
+    Parameters:
+        domain (str): Domain to monitor.
+        interval (float): Seconds to wait between checks.
+        iterations (int): Number of checks to run; zero runs continuously.
+        narrate (bool): Whether to generate a one-line narration when changes occur.
+    
+    Raises:
+        typer.BadParameter: If the interval is less than the minimum allowed value.
+    """
     context: NyxorContext = ctx.obj
     if interval < MIN_INTERVAL_SECONDS:
         raise typer.BadParameter(f"--interval must be >= {MIN_INTERVAL_SECONDS:.0f}s.")

@@ -44,6 +44,12 @@ class ServePlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the `serve` command with the Typer application.
+        
+        Parameters:
+        	app (typer.Typer): The Typer application to register the command with.
+        	context (NyxorContext): The shared NYXOR execution context.
+        """
         app.command("serve", rich_help_panel=self.metadata.category)(_serve)
 
 

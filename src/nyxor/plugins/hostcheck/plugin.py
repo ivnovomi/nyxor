@@ -110,6 +110,13 @@ async def run_hostcheck(
 
 
 def _print_summary(context: NyxorContext, result: ModuleResult) -> None:
+    """
+    Print a Rich summary table of host-check findings and any associated note.
+    
+    Parameters:
+    	context (NyxorContext): Output context containing the console.
+    	result (ModuleResult): Host-check results to display.
+    """
     table = Table(
         title=f"hostcheck — {len(result.findings)} finding(s)",
         show_header=True,
@@ -134,6 +141,14 @@ def _print_summary(context: NyxorContext, result: ModuleResult) -> None:
 
 
 def _kill_high_severity(context: NyxorContext, result: ModuleResult, *, yes: bool) -> None:
+    """
+    Terminate processes associated with high-severity findings after optional confirmation.
+    
+    Parameters:
+        context (NyxorContext): CLI context containing the output console.
+        result (ModuleResult): Module results containing process findings.
+        yes (bool): Whether to skip confirmation prompts.
+    """
     import psutil
 
     targets = [f for f in result.findings if f.severity == Severity.HIGH and "pid" in f.evidence]
@@ -200,6 +215,12 @@ class HostcheckPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the hostcheck command with the Typer application.
+        
+        Parameters:
+        	app (typer.Typer): Typer application to which the command is added.
+        	context (NyxorContext): Application context associated with the plugin.
+        """
         app.command("hostcheck", rich_help_panel=self.metadata.category)(_hostcheck)
 
 

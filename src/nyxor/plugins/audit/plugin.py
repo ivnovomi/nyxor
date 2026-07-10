@@ -33,12 +33,14 @@ _SEVERITY_ORDER = list(Severity)
 
 
 def _hostname_for_dns(domain: str) -> str:
-    """DNS needs a bare hostname — TLS/HTTP both accept a full URL
-
-    (`nyx audit https://example.com/` is meant to work, same as
-    `nyx http inspect` already does), but resolving the literal string
-    "https://example.com/" as a domain name doesn't, so pull the host back
-    out of it first.
+    """
+    Convert a domain, URL, or host-and-port value to a hostname suitable for DNS lookup.
+    
+    Parameters:
+        domain (str): Domain input that may include a URL scheme, port, or IPv6 brackets.
+    
+    Returns:
+        str: The extracted hostname, or the original input when no hostname can be extracted.
     """
     if "://" in domain:
         return urlsplit(domain).hostname or domain
@@ -60,6 +62,14 @@ async def run_audit(domain: str, config: NyxorConfig) -> list[ModuleResult]:
 
 
 def _print_summary(context: NyxorContext, domain: str, results: list[ModuleResult]) -> None:
+    """
+    Display an aggregate audit score and a table summarizing findings by module.
+    
+    Parameters:
+    	context (NyxorContext): Context providing the console used for output.
+    	domain (str): Domain included in the summary title and score badge.
+    	results (list[ModuleResult]): Module results to summarize.
+    """
     score = score_results(results)
     badge = render_terminal_badge(score, label=domain)
     badge.append(f"  {score.points}/100", style="dim")
@@ -90,6 +100,15 @@ def _print_summary(context: NyxorContext, domain: str, results: list[ModuleResul
 async def _print_dumber(
     context: NyxorContext, domain: str, results: list[ModuleResult], *, no_local: bool
 ) -> None:
+    """
+    Display a plain-English explanation of audit findings, using a local model when enabled.
+    
+    Parameters:
+        context (NyxorContext): Runtime context containing console and AI configuration.
+        domain (str): Domain evaluated by the audit.
+        results (list[ModuleResult]): Audit results whose findings are explained.
+        no_local (bool): Whether to skip local-model-generated explanations.
+    """
     console = context.console
     console.print()
     console.rule("[bold]Plain-English rundown[/bold] (no jargon, promise)")
@@ -132,6 +151,12 @@ async def _print_dumber(
 async def _print_fix_suggestions(
     context: NyxorContext, results: list[ModuleResult], *, no_local: bool
 ) -> None:
+    """Print remediation suggestions for medium-or-worse findings using a local model.
+    
+    Parameters:
+        results (list[ModuleResult]): Audit results to use when generating suggestions.
+        no_local (bool): Whether to skip local-model suggestions.
+    """
     console = context.console
     if no_local:
         return
@@ -176,7 +201,17 @@ def _audit(
         help="Skip the local model for --dumber/--fix-suggestions (templates/skip instead).",
     ),
 ) -> None:
-    """Run a combined DNS + TLS + HTTP audit against a domain."""
+    """
+    Run a combined DNS, TLS, and HTTP audit for a domain.
+    
+    Parameters:
+        domain (str): Domain to audit.
+        no_inventory (bool): Skip storing discovered assets in the inventory.
+        badge (Path | None): Optional path for the generated security grade SVG badge.
+        dumber (bool): Include a plain-English explanation of findings.
+        fix_suggestions_flag (bool): Request remediation guidance for medium-or-higher severity findings.
+        no_local (bool): Disable local-model features for explanations and remediation guidance.
+    """
     context: NyxorContext = ctx.obj
     results = asyncio.run(run_audit(domain, context.config))
 
@@ -210,6 +245,12 @@ class AuditPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the audit command with the Typer application.
+        
+        Parameters:
+        	app (typer.Typer): The application to which the command is added.
+        	context (NyxorContext): The application context used by the audit command.
+        """
         app.command("audit", rich_help_panel=self.metadata.category)(_audit)
 
 

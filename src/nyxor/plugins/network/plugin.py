@@ -160,6 +160,13 @@ class NetworkPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """
+        Register the network command group with the application.
+        
+        Parameters:
+        	app (typer.Typer): Application to which the network commands are added.
+        	context (NyxorContext): Application context.
+        """
         app.add_typer(network_app, rich_help_panel=self.metadata.category)
 
 

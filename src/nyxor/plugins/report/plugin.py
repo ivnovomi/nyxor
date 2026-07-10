@@ -46,6 +46,7 @@ class ReportPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """Register the report command group with the application under its metadata-defined help category."""
         app.add_typer(report_app, rich_help_panel=self.metadata.category)
 
 

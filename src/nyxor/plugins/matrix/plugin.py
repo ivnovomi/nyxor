@@ -91,6 +91,13 @@ class MatrixPlugin:
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
+        """
+        Register the Matrix command with the Typer application under the plugin's help category.
+        
+        Parameters:
+        	app (typer.Typer): Typer application to which the command is added.
+        	context (NyxorContext): Application context associated with the plugin.
+        """
         app.command("matrix", rich_help_panel=self.metadata.category)(_matrix)
 
 
