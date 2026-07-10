@@ -196,10 +196,11 @@ class HostcheckPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("hostcheck",),
+        category="Host Security",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("hostcheck")(_hostcheck)
+        app.command("hostcheck", rich_help_panel=self.metadata.category)(_hostcheck)
 
 
 PLUGIN = HostcheckPlugin()

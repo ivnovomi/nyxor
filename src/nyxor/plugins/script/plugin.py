@@ -216,10 +216,11 @@ class ScriptPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("run", "lint", "new", "repl", "lsp"),
+        category="Automation",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.add_typer(script_app)
+        app.add_typer(script_app, rich_help_panel=self.metadata.category)
 
 
 PLUGIN = ScriptPlugin()

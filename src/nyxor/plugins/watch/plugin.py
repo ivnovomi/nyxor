@@ -135,10 +135,11 @@ class WatchPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("watch",),
+        category="Continuous & History",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("watch")(_watch)
+        app.command("watch", rich_help_panel=self.metadata.category)(_watch)
 
 
 PLUGIN = WatchPlugin()

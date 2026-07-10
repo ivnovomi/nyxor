@@ -147,10 +147,11 @@ class ReconPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("recon",),
+        category="Scanning",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("recon")(_recon)
+        app.command("recon", rich_help_panel=self.metadata.category)(_recon)
 
 
 PLUGIN = ReconPlugin()

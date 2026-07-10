@@ -206,10 +206,11 @@ class AuditPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("audit",),
+        category="Scanning",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("audit")(_audit)
+        app.command("audit", rich_help_panel=self.metadata.category)(_audit)
 
 
 PLUGIN = AuditPlugin()

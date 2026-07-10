@@ -153,10 +153,11 @@ class HttpPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("inspect",),
+        category="Scanning",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.add_typer(http_app)
+        app.add_typer(http_app, rich_help_panel=self.metadata.category)
 
 
 PLUGIN = HttpPlugin()

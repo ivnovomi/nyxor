@@ -34,6 +34,35 @@ app = typer.Typer(
 logger = get_logger(__name__)
 
 
+#: `nyx --help` groups commands into a Rich panel per
+#: ``PluginMetadata.category`` (see each plugin's ``register()``), and
+#: panels appear in the order their first command was registered — so this
+#: is the one place that decides the *category* order shown to a first-time
+#: user. A category missing here (a third-party plugin's own name) just
+#: sorts after all of these, rather than erroring.
+_CATEGORY_PRIORITY = (
+    "Scanning",
+    "Continuous & History",
+    "AI (local model)",
+    "Host Security",
+    "Automation",
+    "Dashboard & Reports",
+    "Setup & Config",
+    "API",
+    "Fun",
+)
+
+
+def _category_sort_key(category: str) -> int:
+    """Where ``category`` falls in :data:`_CATEGORY_PRIORITY` — unlisted
+
+    categories (a third-party plugin's own name) sort after all of these.
+    """
+    if category in _CATEGORY_PRIORITY:
+        return _CATEGORY_PRIORITY.index(category)
+    return len(_CATEGORY_PRIORITY)
+
+
 def _register_plugins() -> None:
     """Attach every discovered plugin's commands to the root app.
 
@@ -44,7 +73,9 @@ def _register_plugins() -> None:
     """
     bootstrap_config = load_config()
     bootstrap = NyxorContext(config=bootstrap_config)
-    for discovered in discover_plugins(disabled=bootstrap_config.plugins.disabled):
+    discovered_plugins = discover_plugins(disabled=bootstrap_config.plugins.disabled)
+    discovered_plugins.sort(key=lambda d: _category_sort_key(d.plugin.metadata.category))
+    for discovered in discovered_plugins:
         try:
             discovered.plugin.register(app, bootstrap)
         except Exception as exc:

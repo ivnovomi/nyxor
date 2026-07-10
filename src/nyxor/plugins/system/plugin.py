@@ -24,10 +24,11 @@ class SystemPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("doctor",),
+        category="Setup & Config",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("doctor")(_doctor)
+        app.command("doctor", rich_help_panel=self.metadata.category)(_doctor)
 
 
 PLUGIN = SystemPlugin()

@@ -161,10 +161,11 @@ class AuthPlugin:
         version="0.2.0",
         author="NYXOR",
         commands=("login", "approve", "logout", "whoami"),
+        category="Setup & Config",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.add_typer(auth_app)
+        app.add_typer(auth_app, rich_help_panel=self.metadata.category)
 
 
 PLUGIN = AuthPlugin()

@@ -89,10 +89,11 @@ class AskPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("ask",),
+        category="AI (local model)",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("ask")(_ask)
+        app.command("ask", rich_help_panel=self.metadata.category)(_ask)
 
 
 PLUGIN = AskPlugin()
