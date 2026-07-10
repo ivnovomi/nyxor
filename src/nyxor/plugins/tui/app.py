@@ -47,7 +47,7 @@ from nyxor.core.models import ModuleResult, Severity
 from nyxor.core.plugins import DiscoveredPlugin, discover_plugins
 from nyxor.core.reporting import ReportDocument, get_writer
 from nyxor.core.scripting import TEMPLATE as SCRIPT_TEMPLATE
-from nyxor.core.scripting import LintIssue, ScriptUI, lint_source, run_script
+from nyxor.core.scripting import LintIssue, ScriptError, ScriptUI, lint_source, run_script
 from nyxor.plugins.audit.plugin import run_audit
 from nyxor.plugins.dns_.plugin import run_lookup as dns_run_lookup
 from nyxor.plugins.http_.plugin import run_inspect as http_run_inspect
@@ -607,6 +607,18 @@ class NyxorApp(App[None]):
             await run_script(
                 source, self.config, output=emit, base_dir=Path.cwd(), unsafe=unsafe, ui=ui
             )
+        except ScriptError as exc:
+            log.write(f"[bold #ff4d6d]Error:[/] {escape_markup(exc.reason)}")
+            if exc.line is not None:
+                lines = source.splitlines()
+                if 1 <= exc.line <= len(lines):
+                    snippet = lines[exc.line - 1]
+                    gutter = f"{exc.line} | "
+                    log.write(f"[dim]{gutter}[/]{escape_markup(snippet)}")
+                    caret_col = len(snippet) - len(snippet.lstrip())
+                    log.write(" " * (len(gutter) + caret_col) + "[bold #ff4d6d]^[/]")
+            status.update("[bold #ff4d6d]Script failed.[/]")
+            return
         except NyxorError as exc:
             log.write(f"[bold #ff4d6d]Error:[/] {exc.message}")
             status.update("[bold #ff4d6d]Script failed.[/]")

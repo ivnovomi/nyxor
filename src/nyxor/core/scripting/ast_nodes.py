@@ -68,6 +68,37 @@ class Index:
 
 
 @dataclass(frozen=True)
+class Slice:
+    """``target[start:stop]`` — either bound may be omitted (``list[1:]``,
+
+    ``list[:3]``, ``list[:]``). Works on lists and strings, same semantics
+    as Python slicing.
+    """
+
+    target: Expr
+    start: Expr | None
+    stop: Expr | None
+    line: int
+
+
+@dataclass(frozen=True)
+class Lambda:
+    """``lambda(params): expr`` — an anonymous, single-expression function
+
+    value. Unlike ``func``, a lambda captures a *snapshot* of every
+    variable visible where it's defined (locals and globals both) at
+    definition time — not a live reference, and not NyxScript's usual
+    "no closures" rule for top-level functions. That's what makes
+    ``filter(items, lambda(x): x > threshold)`` see ``threshold`` from the
+    enclosing scope.
+    """
+
+    params: list[str]
+    body: Expr
+    line: int
+
+
+@dataclass(frozen=True)
 class Attr:
     """``expr.name`` where ``expr`` isn't a bare identifier (so the lexer's
 
@@ -82,7 +113,19 @@ class Attr:
     line: int
 
 
-Expr = Literal | ListLiteral | DictLiteral | VarRef | UnaryOp | BinOp | Call | Index | Attr
+Expr = (
+    Literal
+    | ListLiteral
+    | DictLiteral
+    | VarRef
+    | UnaryOp
+    | BinOp
+    | Call
+    | Index
+    | Slice
+    | Attr
+    | Lambda
+)
 
 # --- statements ------------------------------------------------------------
 

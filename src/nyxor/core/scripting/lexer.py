@@ -38,6 +38,7 @@ KEYWORDS = frozenset(
         "import",
         "try",
         "except",
+        "lambda",
         "true",
         "false",
         "and",

@@ -6,6 +6,8 @@ import asyncio
 from pathlib import Path
 
 import typer
+from rich.console import Console
+from rich.markup import escape as escape_markup
 from rich.table import Table
 
 from nyxor.core.context import NyxorContext
@@ -26,6 +28,25 @@ script_app = typer.Typer(
 )
 
 _SEVERITY_STYLE = {"error": "bold red", "warning": "yellow"}
+
+
+def _print_script_error(console: Console, source: str, exc: ScriptError) -> None:
+    """Print a runtime/parse error with the offending source line and a
+
+    caret pointing at it — not just "line N: message", which leaves you
+    counting lines by hand in anything longer than a few of them.
+    """
+    console.print(f"[bold red]Error:[/bold red] {escape_markup(exc.reason)}")
+    if exc.line is None:
+        return
+    lines = source.splitlines()
+    if not (1 <= exc.line <= len(lines)):
+        return
+    snippet = lines[exc.line - 1]
+    gutter = f"{exc.line} | "
+    console.print(f"[dim]{gutter}[/dim]{escape_markup(snippet)}")
+    caret_col = len(snippet) - len(snippet.lstrip())
+    console.print(" " * (len(gutter) + caret_col) + "[bold red]^[/bold red]")
 
 
 def _print_issues(context: NyxorContext, path: Path, issues: list[LintIssue]) -> None:
@@ -99,7 +120,13 @@ def run(
         style = "#7ee7e1" if line.startswith("→") else "dim" if line.startswith("  ") else ""
         console.print(line, style=style or None, markup=False)
 
-    asyncio.run(run_script(source, context.config, output=emit, base_dir=Path.cwd(), unsafe=unsafe))
+    try:
+        asyncio.run(
+            run_script(source, context.config, output=emit, base_dir=Path.cwd(), unsafe=unsafe)
+        )
+    except ScriptError as exc:
+        _print_script_error(console, source, exc)
+        raise typer.Exit(code=1) from exc
     console.print("[bold green]Script finished.[/bold green]")
 
 
@@ -179,13 +206,13 @@ def repl(
         try:
             program = parse(source)
         except ScriptError as exc:
-            console.print(f"[bold red]{exc}[/bold red]")
+            _print_script_error(console, source, exc)
             continue
 
         try:
             asyncio.run(interpreter.run(program))
         except ScriptError as exc:
-            console.print(f"[bold red]{exc}[/bold red]")
+            _print_script_error(console, source, exc)
 
 
 @script_app.command("lsp")

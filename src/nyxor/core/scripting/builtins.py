@@ -7,10 +7,17 @@ unlike `run`/`ui.*` these never need to be awaited by the interpreter.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from typing import Any
 
 BuiltinFn = Callable[[list[Any]], Any]
+
+#: Handled specially by the interpreter (they need to *call* a NyxScript
+#: function value per item, which a plain synchronous builtin can't do) —
+#: not in :data:`BUILTIN_FUNCTIONS`, but the linter/interpreter both treat
+#: a call to one of these as a known function, same as a real builtin.
+HIGHER_ORDER_FUNCTIONS = frozenset({"map", "filter", "sort_by", "reduce"})
 
 
 def _arity_error(name: str, expected: str, got: int) -> TypeError:
@@ -141,6 +148,10 @@ def _type_of(args: list[Any]) -> str:
         return "list"
     if isinstance(value, dict):
         return "dict"
+    # NyxFunction lives in interpreter.py, which imports this module — checking
+    # by class name here avoids a circular import for one string comparison.
+    if type(value).__name__ == "NyxFunction":
+        return "function"
     return type(value).__name__
 
 
@@ -179,6 +190,75 @@ def _get(args: list[Any]) -> Any:
     return mapping.get(key, default)
 
 
+def _replace(args: list[Any]) -> str:
+    if len(args) != 3:
+        raise _arity_error("replace", "3 arguments (text, old, new)", len(args))
+    text, old, new = args
+    return str(text).replace(str(old), str(new))
+
+
+def _starts_with(args: list[Any]) -> bool:
+    if len(args) != 2:
+        raise _arity_error("starts_with", "2 arguments (text, prefix)", len(args))
+    return str(args[0]).startswith(str(args[1]))
+
+
+def _ends_with(args: list[Any]) -> bool:
+    if len(args) != 2:
+        raise _arity_error("ends_with", "2 arguments (text, suffix)", len(args))
+    return str(args[0]).endswith(str(args[1]))
+
+
+def _find(args: list[Any]) -> int:
+    if len(args) != 2:
+        raise _arity_error("find", "2 arguments (text, needle)", len(args))
+    return str(args[0]).find(str(args[1]))
+
+
+def _zip(args: list[Any]) -> list[list[Any]]:
+    if len(args) != 2:
+        raise _arity_error("zip", "2 arguments (list, list)", len(args))
+    a, b = args
+    if not isinstance(a, list) or not isinstance(b, list):
+        raise TypeError("zip() expects two lists")
+    return [[x, y] for x, y in zip(a, b, strict=False)]
+
+
+def _has_null(value: Any) -> bool:
+    """True if a decoded JSON value contains a ``null`` anywhere — NyxScript
+
+    has no null/none to represent one with.
+    """
+    if value is None:
+        return True
+    if isinstance(value, list):
+        return any(_has_null(v) for v in value)
+    if isinstance(value, dict):
+        return any(_has_null(v) for v in value.values())
+    return False
+
+
+def _parse_json(args: list[Any]) -> Any:
+    if len(args) != 1:
+        raise _arity_error("parse_json", "1 argument", len(args))
+    try:
+        value = json.loads(str(args[0]))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"parse_json(): invalid JSON — {exc}") from exc
+    if _has_null(value):
+        raise ValueError("parse_json(): the JSON contains 'null', which NyxScript can't represent")
+    return value
+
+
+def _to_json(args: list[Any]) -> str:
+    if len(args) != 1:
+        raise _arity_error("to_json", "1 argument", len(args))
+    try:
+        return json.dumps(args[0])
+    except TypeError as exc:
+        raise TypeError(f"to_json(): {exc}") from exc
+
+
 BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "len": _len,
     "range": _range,
@@ -203,4 +283,11 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "values": _values,
     "items": _items,
     "get": _get,
+    "replace": _replace,
+    "starts_with": _starts_with,
+    "ends_with": _ends_with,
+    "find": _find,
+    "zip": _zip,
+    "parse_json": _parse_json,
+    "to_json": _to_json,
 }

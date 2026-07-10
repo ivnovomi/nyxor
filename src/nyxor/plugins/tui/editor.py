@@ -69,6 +69,7 @@ _ACTION_KEYWORDS = {
     "assert",
     "fail",
     "func",
+    "lambda",
     "import",
 }
 _BOOL_KEYWORDS = {"true", "false"}

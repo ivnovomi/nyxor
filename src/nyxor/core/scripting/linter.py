@@ -39,6 +39,7 @@ from nyxor.core.scripting.ast_nodes import (
     ImportStmt,
     Index,
     IndexSetStmt,
+    Lambda,
     ListLiteral,
     Literal,
     PipStmt,
@@ -50,13 +51,14 @@ from nyxor.core.scripting.ast_nodes import (
     SaveStmt,
     SetStmt,
     SleepStmt,
+    Slice,
     Stmt,
     TryStmt,
     UnaryOp,
     VarRef,
     WhileStmt,
 )
-from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
+from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS, HIGHER_ORDER_FUNCTIONS
 from nyxor.core.scripting.errors import ScriptError
 from nyxor.core.scripting.parser import parse, parse_expression
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
@@ -146,12 +148,20 @@ def _check_call(
             issues.append(LintIssue("error", call.line, f"undefined variable '{module_name}'"))
         return
 
-    if call.callee in BUILTIN_FUNCTIONS or call.callee in functions:
+    if call.callee in BUILTIN_FUNCTIONS or call.callee in HIGHER_ORDER_FUNCTIONS:
+        return
+    if call.callee in functions:
         return
     if _PERMISSIVE in defined:
         return
+    if call.callee in defined:
+        # A plain variable — could hold a lambda/function value (e.g. `set
+        # sq = lambda(x): x * x` then `sq(5)`). The linter can't statically
+        # know it's callable; the interpreter raises a clear error at run
+        # time if it isn't.
+        return
 
-    candidates = list(BUILTIN_FUNCTIONS) + sorted(functions)
+    candidates = list(BUILTIN_FUNCTIONS) + list(HIGHER_ORDER_FUNCTIONS) + sorted(functions)
     suggestions = difflib.get_close_matches(call.callee, candidates, n=1)
     hint = f" Did you mean '{suggestions[0]}'?" if suggestions else ""
     issues.append(LintIssue("error", call.line, f"unknown function '{call.callee}'.{hint}"))
@@ -186,6 +196,14 @@ def _check_expr(
         case Index(target=target, index=index_expr):
             _check_expr(target, defined, functions, issues)
             _check_expr(index_expr, defined, functions, issues)
+        case Slice(target=target, start=start_expr, stop=stop_expr):
+            _check_expr(target, defined, functions, issues)
+            if start_expr is not None:
+                _check_expr(start_expr, defined, functions, issues)
+            if stop_expr is not None:
+                _check_expr(stop_expr, defined, functions, issues)
+        case Lambda(params=params, body=body):
+            _check_expr(body, defined | set(params), functions, issues)
         case Attr(target=target):
             # The member itself can't be statically checked — it depends on
             # the runtime type of `target`, which the linter doesn't infer.

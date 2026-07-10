@@ -28,6 +28,7 @@ from nyxor.core.scripting.ast_nodes import (
     ImportStmt,
     Index,
     IndexSetStmt,
+    Lambda,
     ListLiteral,
     Literal,
     PipStmt,
@@ -39,6 +40,7 @@ from nyxor.core.scripting.ast_nodes import (
     SaveStmt,
     SetStmt,
     SleepStmt,
+    Slice,
     Stmt,
     TryStmt,
     UnaryOp,
@@ -452,9 +454,16 @@ class Parser:
                 continue
             if self._peek().type == "[":
                 line = self._advance().line
-                index_expr = self.parse_expr()
-                self._expect_op("]")
-                expr = Index(target=expr, index=index_expr, line=line)
+                start_expr = None if self._peek().type == ":" else self.parse_expr()
+                if self._peek().type == ":":
+                    self._advance()
+                    stop_expr = None if self._peek().type == "]" else self.parse_expr()
+                    self._expect_op("]")
+                    expr = Slice(target=expr, start=start_expr, stop=stop_expr, line=line)
+                else:
+                    self._expect_op("]")
+                    assert start_expr is not None
+                    expr = Index(target=expr, index=start_expr, line=line)
                 continue
             if self._peek().type == ".":
                 line = self._advance().line
@@ -482,6 +491,20 @@ class Parser:
         if token.type == "IDENT" and token.value == "false":
             self._advance()
             return Literal(False, token.line)
+
+        if token.type == "IDENT" and token.value == "lambda":
+            self._advance()
+            self._expect_op("(")
+            params: list[str] = []
+            if self._peek().type != ")":
+                params.append(self._expect_type("IDENT", "a parameter name").value)
+                while self._peek().type == ",":
+                    self._advance()
+                    params.append(self._expect_type("IDENT", "a parameter name").value)
+            self._expect_op(")")
+            self._expect_op(":")
+            body = self.parse_expr()
+            return Lambda(params=params, body=body, line=token.line)
 
         if token.type == "[":
             self._advance()

@@ -23,12 +23,14 @@ NyxScript somewhere new.
 - [Variables](#variables)
 - [Expressions and operators](#expressions-and-operators)
 - [Dicts](#dicts)
+- [Slicing](#slicing)
 - [String interpolation](#string-interpolation)
 - [Control flow](#control-flow)
 - [Error handling — `try`/`except`](#error-handling--tryexcept)
 - [Running scan modules](#running-scan-modules-run)
 - [Saving reports](#saving-reports-save)
 - [Functions](#functions)
+- [Lambdas and higher-order functions](#lambdas-and-higher-order-functions)
 - [Libraries — `import`](#libraries--import)
 - [The standard library — `lib/`](#the-standard-library--lib)
 - [Built-in functions](#built-in-functions)
@@ -156,6 +158,26 @@ error too — use `get(d, "missing", default)` to avoid one. See
 Index assignment is unrelated to `.field` access above — it mutates a
 plain list/dict *value* the script itself created, not a scan result
 (those stay read-only).
+
+## Slicing
+
+Lists and strings support Python-style slicing; either bound can be
+omitted:
+
+```
+set nums = [1, 2, 3, 4, 5]
+print nums[1:3]     # [2, 3]
+print nums[:2]      # [1, 2]
+print nums[3:]      # [4, 5]
+print nums[:]       # [1, 2, 3, 4, 5] — a shallow copy
+print "hello"[1:4]  # ell
+```
+
+Slicing a dict is a runtime error — there's no ordering to slice by
+beyond insertion order, and `pick()`/`{k: v for ...}`-style filtering
+doesn't map cleanly onto a `start:stop` pair. Slice bounds can't be
+assigned to (`set nums[1:3] = ...` is a parse error) — only single-index
+assignment (`set nums[1] = ...`) is supported.
 
 ## String interpolation
 
@@ -306,6 +328,48 @@ calls into an imported library, e.g. hovering `math.square(4)` shows
 line on go-to-definition. The TUI's editor highlights a docstring line
 differently from an ordinary string.
 
+## Lambdas and higher-order functions
+
+```
+set square = lambda(x): x * x
+print square(5)   # 25
+```
+
+`lambda(params): expr` is a single-expression, anonymous function value —
+no `end`, the whole thing is one expression. Unlike `func`, **a lambda
+captures a snapshot of every variable visible where it's defined** (both
+locals and globals, frozen at definition time, not a live reference) —
+that's what makes this work:
+
+```
+func find_big(items, threshold):
+    return filter(items, lambda(x): x > threshold)
+end
+
+print find_big([1, 2, 3, 4, 5], 3)   # [4, 5]
+```
+
+`threshold` is `find_big`'s own local parameter; the lambda passed to
+`filter` still sees it, because it captured it when it was created —
+`func` bodies can't do this (see [Functions](#functions) above).
+
+Four built-ins take a list and a function value (a lambda, or a plain
+variable that holds one) and call it per item:
+
+| Function | Signature | Returns |
+|---|---|---|
+| `map` | `map(list, fn)` | a new list of `fn(item)` for each item |
+| `filter` | `filter(list, fn)` | items where `fn(item)` is truthy |
+| `sort_by` | `sort_by(list, fn)` | the list sorted by `fn(item)` as the key |
+| `reduce` | `reduce(list, fn, initial)` | folds: `acc = fn(acc, item)` for each item, starting from `initial` |
+
+```
+set nums = [1, 2, 3, 4]
+print map(nums, lambda(x): x * 2)              # [2, 4, 6, 8]
+print filter(nums, lambda(x): x > 2)            # [3, 4]
+print reduce(nums, lambda(acc, x): acc + x, 0)  # 10
+```
+
 ## Libraries — `import`
 
 Any `.nyx` file can be imported into another as a namespaced bag of
@@ -398,6 +462,16 @@ Pure, synchronous, no I/O — safe to call anywhere, no `--unsafe` needed.
 | `keys` / `values` | `keys(d)` / `values(d)` | → list, in insertion order |
 | `items` | `items(d)` | → list of `[key, value]` pairs |
 | `get` | `get(d, key, default)` | dict lookup with a mandatory default (no `null` to fall back to otherwise) |
+| `replace` | `replace(s, old, new)` | |
+| `starts_with` / `ends_with` | `starts_with(s, prefix)` / `ends_with(s, suffix)` | |
+| `find` | `find(s, needle)` | index of the first match, or `-1` |
+| `zip` | `zip(list, list)` | → list of `[a, b]` pairs, stops at the shorter list |
+| `parse_json` | `parse_json(s)` | JSON → NyxScript value. Errors on `null` (no way to represent it) |
+| `to_json` | `to_json(value)` | NyxScript value → JSON string |
+
+See [Lambdas and higher-order functions](#lambdas-and-higher-order-functions)
+for `map`/`filter`/`sort_by`/`reduce`, which take a function value and so
+aren't plain synchronous builtins like the ones above.
 
 ## Interactive UI — `ui.*`
 
@@ -522,9 +596,19 @@ missing members on an imported library (see
 ## Errors
 
 Every NyxScript exception (`LexError`, `ParseError`, `RuntimeScriptError`)
-carries the source line it happened on and prints as `line N: message`.
+carries the source line it happened on. `nyx script run` and `nyx script
+repl` print the offending source line itself alongside the message, with
+a caret under where it starts:
+
+```
+Error: cannot apply '+' to int and str
+3 | print x + y
+    ^
+```
+
 `nyx script run` stops at the first uncaught error; nothing after it
-executes.
+executes. `try`/`except` (see [Error handling](#error-handling--tryexcept))
+lets a script catch one and keep going instead.
 
 ## Full grammar
 
@@ -567,14 +651,16 @@ comparison     := additive (("==" | "!=" | "<" | "<=" | ">" | ">=") additive)?
 additive       := multiplicative (("+" | "-") multiplicative)*
 multiplicative := unary (("*" | "/") unary)*
 unary          := "-" unary | postfix
-postfix        := primary (call_suffix | index_suffix | attr_suffix)*
+postfix        := primary (call_suffix | index_suffix | slice_suffix | attr_suffix)*
 call_suffix    := "(" (expr ("," expr)*)? ")"
 index_suffix   := "[" expr "]"
+slice_suffix   := "[" expr? ":" expr? "]"
 attr_suffix    := "." IDENT
 primary        := NUMBER | STRING | "true" | "false"
                 | "[" (expr ("," expr)*)? "]"
                 | "{" (expr ":" expr ("," expr ":" expr)*)? "}"
                 | "(" expr ")"
+                | "lambda" "(" (IDENT ("," IDENT)*)? ")" ":" expr
                 | IDENT                            # a variable, or a call/index base
 ```
 

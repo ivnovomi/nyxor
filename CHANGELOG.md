@@ -2,6 +2,29 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.6.0 — Lambdas, higher-order functions, slicing, JSON, and better errors
+
+### NyxScript language
+- **Lambdas**: `lambda(params): expr` — a single-expression anonymous
+  function value. Unlike `func`, a lambda captures a *snapshot* of every
+  variable visible where it's defined (locals and globals both, frozen at
+  creation time), so `filter(items, lambda(x): x > threshold)` sees
+  `threshold` from the enclosing function's own parameters.
+- **Higher-order functions**: `map(list, fn)`, `filter(list, fn)`,
+  `sort_by(list, fn)`, `reduce(list, fn, initial)` — take a function
+  value (a lambda or a variable holding one) and call it per item.
+- **Slicing**: `list[1:3]`, `list[:2]`, `list[3:]`, `list[:]`, and the
+  same on strings — Python semantics, either bound optional. Not
+  assignable, not valid on dicts.
+- **JSON**: `parse_json(s)` / `to_json(value)`. `parse_json` errors on a
+  `null` anywhere in the JSON — NyxScript has no way to represent one.
+- **More string/list builtins**: `replace`, `starts_with`, `ends_with`,
+  `find`, `zip`.
+- **Better runtime errors**: `nyx script run`/`repl` now print the
+  offending source line itself with a caret under it, not just
+  `line N: message`.
+- VS Code extension and the Claude Skill updated for the new grammar.
+
 ## 0.5.5 — Help on steroids, a hardened local-AI client, and a rewritten README
 
 - `nyx --help` now groups all 24 commands into named panels (Scanning, AI,

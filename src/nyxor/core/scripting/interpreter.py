@@ -46,6 +46,7 @@ from nyxor.core.scripting.ast_nodes import (
     ImportStmt,
     Index,
     IndexSetStmt,
+    Lambda,
     ListLiteral,
     Literal,
     PipStmt,
@@ -57,6 +58,7 @@ from nyxor.core.scripting.ast_nodes import (
     SaveStmt,
     SetStmt,
     SleepStmt,
+    Slice,
     Stmt,
     TryStmt,
     UnaryOp,
@@ -64,7 +66,7 @@ from nyxor.core.scripting.ast_nodes import (
     WhileStmt,
     function_docstring,
 )
-from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
+from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS, HIGHER_ORDER_FUNCTIONS
 from nyxor.core.scripting.errors import RuntimeScriptError, ScriptError
 from nyxor.core.scripting.parser import parse, parse_expression
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
@@ -262,6 +264,18 @@ class Interpreter:
                 return self._get_var(name, line)
             case Index(target=target, index=index_expr, line=line):
                 return await self._eval_index(target, index_expr, line)
+            case Slice(target=target, start=start_expr, stop=stop_expr, line=line):
+                return await self._eval_slice(target, start_expr, stop_expr, line)
+            case Lambda(params=params, body=body, line=line):
+                captured = dict(self.env)
+                if self.call_stack:
+                    captured.update(self.call_stack[-1])
+                return NyxFunction(
+                    name="<lambda>",
+                    params=params,
+                    body=[ReturnStmt(value=body, line=line)],
+                    home_env=captured,
+                )
             case Attr(target=target, name=name, line=line):
                 return self._get_member(await self.eval_expr(target), name, line)
             case Call() as call:
@@ -308,8 +322,65 @@ class Interpreter:
         except (IndexError, KeyError) as exc:
             raise RuntimeScriptError(f"index {idx!r} out of range", line=line) from exc
 
+    async def _eval_slice(
+        self, target: Expr, start_expr: Expr | None, stop_expr: Expr | None, line: int
+    ) -> Any:
+        container = await self.eval_expr(target)
+        if not isinstance(container, list | str):
+            raise RuntimeScriptError(f"cannot slice a {type(container).__name__}", line=line)
+        start = await self.eval_expr(start_expr) if start_expr is not None else None
+        stop = await self.eval_expr(stop_expr) if stop_expr is not None else None
+        try:
+            return container[start:stop]
+        except TypeError as exc:
+            raise RuntimeScriptError("slice bounds must be integers", line=line) from exc
+
+    async def _call_higher_order(self, name: str, args: list[Any], line: int) -> Any:
+        def check_list(value: Any) -> None:
+            if not isinstance(value, list):
+                raise RuntimeScriptError(
+                    f"{name}() expects a list, got {type(value).__name__}", line=line
+                )
+
+        def check_function(value: Any) -> None:
+            if not isinstance(value, NyxFunction):
+                raise RuntimeScriptError(
+                    f"{name}() expects a function, got {type(value).__name__}", line=line
+                )
+
+        if name in ("map", "filter", "sort_by"):
+            if len(args) != 2:
+                raise RuntimeScriptError(f"{name}() expects 2 arguments (list, fn)", line=line)
+            items, fn = args
+            check_list(items)
+            check_function(fn)
+            if name == "map":
+                return [await self._call_function(fn, [item], line) for item in items]
+            if name == "filter":
+                out = []
+                for item in items:
+                    if _truthy(await self._call_function(fn, [item], line)):
+                        out.append(item)
+                return out
+            keyed = [(await self._call_function(fn, [item], line), item) for item in items]
+            keyed.sort(key=lambda pair: pair[0])
+            return [item for _key, item in keyed]
+
+        # reduce(list, fn, initial)
+        if len(args) != 3:
+            raise RuntimeScriptError("reduce() expects 3 arguments (list, fn, initial)", line=line)
+        items, fn, acc = args
+        check_list(items)
+        check_function(fn)
+        for item in items:
+            acc = await self._call_function(fn, [acc, item], line)
+        return acc
+
     async def _eval_call(self, call: Call) -> Any:
         args = [await self.eval_expr(arg) for arg in call.args]
+
+        if call.callee in HIGHER_ORDER_FUNCTIONS:
+            return await self._call_higher_order(call.callee, args, call.line)
 
         if "." in call.callee:
             module_name, member = call.callee.split(".", 1)
@@ -343,9 +414,11 @@ class Interpreter:
         if isinstance(value, NyxFunction):
             return await self._call_function(value, args, call.line)
 
-        candidates = list(BUILTIN_FUNCTIONS) + [
-            k for k, v in self.env.items() if isinstance(v, NyxFunction)
-        ]
+        candidates = (
+            list(BUILTIN_FUNCTIONS)
+            + list(HIGHER_ORDER_FUNCTIONS)
+            + [k for k, v in self.env.items() if isinstance(v, NyxFunction)]
+        )
         suggestions = difflib.get_close_matches(call.callee, candidates, n=1)
         hint = f" Did you mean '{suggestions[0]}'?" if suggestions else ""
         raise RuntimeScriptError(f"unknown function '{call.callee}'.{hint}", line=call.line)

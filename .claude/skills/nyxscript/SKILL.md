@@ -140,6 +140,28 @@ print square(5)   # 25
 Recursion works (200-frame cap). Argument count is checked at call time.
 `return`/`break`/`continue` outside valid context are lint errors.
 
+**Lambdas and higher-order functions**: `lambda(params): expr` is a
+single-expression anonymous function value. Unlike `func`, **a lambda
+captures a snapshot of every variable visible where it's defined**
+(locals and globals, frozen at creation time) — so a lambda built inside
+a `func` body can see that function's own parameters:
+
+```
+func find_big(items, threshold):
+    return filter(items, lambda(x): x > threshold)
+end
+```
+
+`map(list, fn)`, `filter(list, fn)`, `sort_by(list, fn)`, and
+`reduce(list, fn, initial)` take a function value (a lambda, or a
+variable holding one) and call it per item — these aren't plain
+synchronous builtins, they're handled specially by the interpreter, but
+they lint and call exactly like one.
+
+**Slicing**: `list[1:3]`, `list[:2]`, `list[3:]`, `list[:]`, and the
+same on strings — Python semantics, either bound optional. Not
+assignable (`set x[1:3] = ...` is a parse error) and not valid on dicts.
+
 **Libraries — `import`**: any `.nyx` file can be imported as a
 namespaced bag of functions/constants.
 
@@ -159,8 +181,10 @@ time.
 **Built-ins** (pure, no I/O, safe anywhere): `len`, `range`, `upper`,
 `lower`, `strip`, `split`, `join`, `contains`, `str`, `int`, `float`,
 `abs`, `round`, `sorted`, `reversed`, `min`, `max`, `sum`, `type_of`,
-`keys`, `values`, `items`, `get`. No `%` operator — use `mod(a, b)` from
-`lib/math.nyx` (see below).
+`keys`, `values`, `items`, `get`, `replace`, `starts_with`, `ends_with`,
+`find`, `zip`, `parse_json`, `to_json`. No `%` operator — use `mod(a, b)`
+from `lib/math.nyx` (see below). `parse_json` errors on `null` (no way
+to represent it — same reason `get()`'s default is mandatory).
 
 **Standard library — `lib/`** (all written in NyxScript itself, `import
 "lib/NAME.nyx" as alias` same as any other library):
@@ -205,8 +229,11 @@ print "status: {status}"
   needs one, indentation is cosmetic only.
 - Writing `x.y = z` — attribute access is read-only; there's no field
   assignment on scan results.
-- Assuming closures — a function can't see a caller's local variables;
-  only its own locals and its *defining* scope's globals.
+- Assuming a `func` has closures — it can't see a caller's local
+  variables, only its own locals and its *defining* scope's globals.
+  Lambdas are the exception: they capture everything visible at creation.
+- Writing `set x[1:3] = ...` — slice assignment doesn't exist, only
+  single-index assignment (`set x[1] = ...`).
 - Reaching for `python:`/`pip` for things the built-ins already cover
   (string ops, list ops, math) — adds an unsafe flag for no reason.
 - Forgetting that `run`'s module names use dotted syntax
