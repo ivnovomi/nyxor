@@ -1,6 +1,6 @@
 [project]
 name = "nyxor"
-version = "0.3.0"
+version = "0.3.5"
 description = "NYXOR — a modular, cross-platform security assessment and infrastructure auditing toolkit."
 readme = "README.md"
 authors = [
@@ -33,6 +33,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "textual>=1.0.0",
     "numpy>=2.0.0",
+    "psutil>=6.0.0",
 ]
 
 [project.optional-dependencies]
@@ -43,6 +44,7 @@ dev = [
     "mypy>=1.14.0",
     "ruff>=0.8.4",
     "types-pyyaml>=6.0.12",
+    "types-psutil>=6.0.0",
 ]
 lsp = [
     "pygls>=1.3.0",
@@ -51,6 +53,9 @@ api = [
     "fastapi>=0.115.0",
     "uvicorn>=0.32.0",
     "slowapi>=0.1.9",
+]
+mcp = [
+    "mcp>=1.0.0",
 ]
 
 [project.scripts]
@@ -79,6 +84,10 @@ serve = "nyxor.plugins.serve.plugin:PLUGIN"
 auth = "nyxor.plugins.auth.plugin:PLUGIN"
 trends = "nyxor.plugins.trends.plugin:PLUGIN"
 analyze = "nyxor.plugins.analyze.plugin:PLUGIN"
+recon = "nyxor.plugins.recon.plugin:PLUGIN"
+matrix = "nyxor.plugins.matrix.plugin:PLUGIN"
+hostcheck = "nyxor.plugins.hostcheck.plugin:PLUGIN"
+mcp_cmd = "nyxor.plugins.mcp_cmd.plugin:PLUGIN"
 
 [build-system]
 requires = ["uv_build>=0.11.21,<0.12.0"]

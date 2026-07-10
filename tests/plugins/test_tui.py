@@ -21,6 +21,7 @@ def test_module_choices_cover_every_domain_plugin() -> None:
         "dns.lookup",
         "tls.inspect",
         "http.inspect",
+        "recon.subdomains",
     }
 
 

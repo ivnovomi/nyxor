@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from urllib.parse import urlsplit
 
 import typer
 
@@ -20,9 +21,17 @@ tls_app = typer.Typer(
 
 
 def _parse_target(target: str) -> tuple[str, int]:
+    # A full URL (nyx audit accepts one, same as http.inspect) — pull the
+    # host/port back out instead of treating "https" as the hostname and
+    # "//example.com/" as the port.
+    if "://" in target:
+        parsed = urlsplit(target)
+        if parsed.hostname:
+            return parsed.hostname, parsed.port or 443
     if ":" in target and not target.startswith("["):
         host, _, port_str = target.rpartition(":")
-        return host, int(port_str)
+        if port_str.isdigit():
+            return host, int(port_str)
     return target, 443
 
 

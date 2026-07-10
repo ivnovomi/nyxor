@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
       - name: Install dependencies
-        run: uv sync --extra dev --extra lsp --extra api
+        run: uv sync --extra dev --extra lsp --extra api --extra mcp
       - name: ruff check
         run: uv run ruff check .
       - name: ruff format --check
@@ -43,7 +43,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
       - name: Install dependencies
-        run: uv sync --extra dev --extra lsp --extra api
+        run: uv sync --extra dev --extra lsp --extra api --extra mcp
       - name: pytest
         run: uv run pytest -q
       - name: Smoke-test the CLI

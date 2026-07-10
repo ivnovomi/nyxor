@@ -1,0 +1,39 @@
+# Strings Lib for NyxScript port.
+# Created by: ivnovomi<idimnovdie1602@protonmail.com>
+
+func title_case(s):
+    set words = split(s, " ")
+    set result = []
+
+    foreach w in words:
+        if len(w) == 0:
+            set result = result + [w]
+        else:
+            set rest = ""
+            set i = 1
+
+            while i < len(w):
+                set rest = rest + w[i]
+                set i = i + 1
+            end
+            set result = result + [upper(w[0]) + rest]
+        end
+    end
+    return join(result, " ")
+end
+
+func truncate(s, max_len):
+    if (len(s) <= max_len):
+        return s
+    end
+
+    set out = ""
+    set i = 0
+    
+    while i < max_len:
+        set out = out + s[i]
+        set i = i + 1
+    end
+    
+    return out + "..."
+end

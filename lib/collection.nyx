@@ -1,0 +1,31 @@
+func unique(items):
+    set out = []
+
+    foreach item in items:
+        if not contains(out, item):
+            set out = out + [item]
+        end
+    end
+
+    return out
+end
+
+func chunk(items, size):
+    set out = []
+    set current = []
+
+    foreach item in items:
+        set current = current + [item]
+        
+        if len(current) == size:
+            set out = out + [current]
+            set current = []
+        end
+    end
+
+    if len(current) > 0:
+        set out = out + [current]
+    end
+
+    return out
+end

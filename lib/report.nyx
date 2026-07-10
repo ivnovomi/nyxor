@@ -1,0 +1,6 @@
+import "lib/finding.nyx" as findings
+
+
+func print_summary(results, target):
+    set total = findings.count_by_severity(results, target)
+end
