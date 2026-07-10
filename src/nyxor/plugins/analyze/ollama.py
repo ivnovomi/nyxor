@@ -49,7 +49,14 @@ async def generate(
     model: str = "llama3.2",
     timeout_seconds: float = 30.0,
 ) -> str:
-    """POST to Ollama's `/api/generate` and return the model's text response."""
+    """POST to Ollama's `/api/generate` and return the model's text response.
+
+    Every failure mode here — connection refused, a bad status, a timeout,
+    any other transport error, or a response body that isn't the JSON we
+    expect — raises :class:`OllamaUnavailable` and nothing else, so callers
+    only ever need to catch that one type to get the "never crashes a
+    command that would otherwise work fine without AI" guarantee.
+    """
     url = host.rstrip("/") + "/api/generate"
     try:
         async with httpx.AsyncClient(timeout=timeout_seconds) as client:
@@ -58,6 +65,7 @@ async def generate(
                 json={"model": model, "prompt": prompt, "stream": False},
             )
             response.raise_for_status()
+            payload: dict[str, object] = response.json()
     except httpx.ConnectError as exc:
         raise OllamaUnavailable(f"no model server reachable at {host}") from exc
     except httpx.HTTPStatusError as exc:
@@ -67,8 +75,16 @@ async def generate(
         ) from exc
     except httpx.TimeoutException as exc:
         raise OllamaUnavailable(f"model server at {host} timed out") from exc
+    except httpx.HTTPError as exc:
+        # Any other transport-level failure (DNS, proxy, protocol errors, a
+        # malformed --host, ...) that isn't one of the specific cases above.
+        raise OllamaUnavailable(f"error talking to model server at {host}: {exc}") from exc
+    except ValueError as exc:
+        # response.json() raised — the server at `host` responded, but not
+        # with valid JSON (e.g. --host pointed at something that isn't
+        # Ollama at all).
+        raise OllamaUnavailable(f"model server at {host} returned an invalid response") from exc
 
-    payload: dict[str, object] = response.json()
     text = payload.get("response")
     if not isinstance(text, str) or not text:
         raise OllamaUnavailable(f"model server at {host} returned an empty response")
