@@ -1,0 +1,50 @@
+name: Publish to PyPI
+
+# Fires only on a `vX.Y.Z` tag push — the same tags `gh release create` uses
+# elsewhere in this project's release process. Uses PyPI's Trusted
+# Publishing (OIDC): no PyPI API token lives in this repo at all. Before
+# this workflow can succeed, the project owner has to register it as a
+# trusted publisher on pypi.org once — see docs/publishing.md.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - name: Build sdist and wheel
+        run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/nyxor
+    permissions:
+      # Required for PyPI Trusted Publishing (OIDC) — no token needed.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1

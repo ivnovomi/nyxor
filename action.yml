@@ -30,6 +30,13 @@ inputs:
     description: Git ref of ivnovomi/nyxor to install (branch, tag, or commit).
     required: false
     default: main
+  pr-comment:
+    description: >-
+      Post the grade as a comment on the pull request this action ran on.
+      Only fires on `pull_request` events; the calling workflow needs
+      `permissions: pull-requests: write`. No-op otherwise.
+    required: false
+    default: "true"
 
 outputs:
   grade:
@@ -91,3 +98,23 @@ runs:
           echo ""
           echo "Grade: **$grade**"
         } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment on the pull request
+      if: inputs.pr-comment == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        NYXOR_TARGET: ${{ inputs.target }}
+        GRADE: ${{ steps.audit.outputs.grade }}
+      run: |
+        set -euo pipefail
+
+        body="### 🛡️ NYXOR audit — \`$NYXOR_TARGET\`
+
+        Grade: **$GRADE**
+
+        <sub>via [nyxor](https://github.com/ivnovomi/nyxor)</sub>"
+
+        gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$body"

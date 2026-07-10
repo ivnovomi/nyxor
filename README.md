@@ -153,6 +153,7 @@ installed.
 - [Passive recon — `nyx recon`](#passive-recon--nyx-recon)
 - [MCP server & Claude](#mcp-server--claude)
 - [The REST API](#the-rest-api)
+- [Use in CI — the GitHub Action](#use-in-ci--the-github-action)
 - [The dashboard](#the-dashboard)
 - [NyxScript](#nyxscript)
   - [Dicts and error handling](#dicts-and-error-handling)
@@ -296,6 +297,38 @@ Other endpoints: `GET /health`, `GET /plugins`, `GET /audit/{domain}`,
 `GET /dns/{domain}`, `GET /tls/{target}`, `GET /http?url=...`,
 `GET /inventory`. All return the same `ModuleResult`/`Finding` JSON shapes
 the CLI's `--json` does, because they're the same Pydantic models.
+
+## Use in CI — the GitHub Action
+
+NYXOR ships as a GitHub Action (`action.yml` at the repo root), so any
+workflow can run an audit without installing Python or NYXOR itself —
+it's just another front-end over the same `run_*()` coroutines:
+
+```yaml
+name: Security audit
+on: [pull_request]
+
+permissions:
+  pull-requests: write   # only needed for the PR-comment step below
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ivnovomi/nyxor@v1
+        with:
+          target: example.com
+          badge-path: nyxor-badge.svg
+```
+
+Outputs a `grade` (`A+` down to `F`) you can gate on, writes an HTML
+report and an SVG badge as build artifacts, drops a summary into the
+job's Actions tab, and — on a `pull_request` event, if the calling
+workflow grants `pull-requests: write` — posts the grade as a PR comment
+automatically (`pr-comment: "false"` to opt out). See
+[action.yml](action.yml) for every input, and
+[.github/workflows/cloud-demo.yml](.github/workflows/cloud-demo.yml) for
+a working example that runs on a schedule and commits the result.
 
 ## The dashboard
 
@@ -489,6 +522,20 @@ implementation.
   analyze`/`ask`/`--dumber`/`--fix-suggestions`/`--narrate`) — everything
   else needs nothing beyond the base install.
 
+## Install
+
+```bash
+pipx install nyxor   # or: uv tool install nyxor / pip install nyxor
+nyx --help
+```
+
+`pipx`/`uv tool install` are recommended over a bare `pip install` for a
+CLI tool — they isolate NYXOR's dependencies from whatever else is on
+your system Python. `uv sync --extra mcp`/`--extra lsp`/`--extra api`
+aren't available this way (extras only apply to a project checkout,
+below) — for those, or to hack on NYXOR itself, install from source
+instead.
+
 ## Install (development)
 
 ```bash
@@ -549,4 +596,6 @@ the badge at the top of this file.
 
 ## Contributing
 
-See [docs/contributing.md](docs/contributing.md).
+See [docs/contributing.md](docs/contributing.md). Cutting a release (PyPI
+and the GitHub Action's version tag) is documented separately in
+[docs/publishing.md](docs/publishing.md).
