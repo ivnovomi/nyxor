@@ -1,0 +1,28 @@
+name: TMP test fail-on
+on:
+  workflow_dispatch: {}
+
+jobs:
+  should-fail:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    outputs:
+      exceeded: ${{ steps.audit.outputs.exceeded-fail-on }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: audit
+        uses: ./
+        with:
+          target: example.com
+          report-path: ""
+          badge-path: ""
+          pr-comment: "false"
+          fail-on: medium
+
+  report:
+    needs: should-fail
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "exceeded output: ${{ needs.should-fail.outputs.exceeded }}"
+          echo "should-fail job result: ${{ needs.should-fail.result }}"

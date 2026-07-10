@@ -15,7 +15,9 @@ inputs:
   report-path:
     description: >-
       Path to write the report to. Format is inferred from the extension
-      (.json, .md, .html). Leave empty to skip writing a report.
+      (.json, .md, .html, .sarif — pipe .sarif into
+      github/codeql-action/upload-sarif for GitHub Security tab alerts).
+      Leave empty to skip writing a report.
     required: false
     default: nyxor-report.html
   badge-path:
@@ -37,11 +39,24 @@ inputs:
       `permissions: pull-requests: write`. No-op otherwise.
     required: false
     default: "true"
+  fail-on:
+    description: >-
+      Fail this action if any finding is at least this severity
+      (critical, high, medium, low, or info). Leave empty (the default) to
+      never fail based on findings — reports/badges/PR comments still get
+      written either way; this only controls the final job result.
+    required: false
+    default: ""
 
 outputs:
   grade:
     description: Letter grade (A+ down to F).
     value: ${{ steps.audit.outputs.grade }}
+  exceeded-fail-on:
+    description: >-
+      "true" if `fail-on` was set and a finding met or exceeded it,
+      "false" otherwise.
+    value: ${{ steps.audit.outputs.exceeded }}
 
 runs:
   using: composite
@@ -59,8 +74,13 @@ runs:
         NYXOR_REPORT_PATH: ${{ inputs.report-path }}
         NYXOR_BADGE_PATH: ${{ inputs.badge-path }}
         NYXOR_REF: ${{ inputs.nyxor-ref }}
+        NYXOR_FAIL_ON: ${{ inputs.fail-on }}
       run: |
-        set -euo pipefail
+        # No `-e`: `nyx audit --fail-on` exiting non-zero is an expected,
+        # meaningful outcome here, not a script bug — it needs to be
+        # captured and acted on below (after the report/summary/PR-comment
+        # steps still run), not let `set -e` kill this step mid-way through.
+        set -uo pipefail
 
         # Values above arrive via env: (not spliced into this script by
         # GitHub's expression templating) so they're treated as inert data
@@ -78,10 +98,14 @@ runs:
         if [ -n "$NYXOR_BADGE_PATH" ]; then
           args+=(--badge "$NYXOR_BADGE_PATH")
         fi
+        if [ -n "$NYXOR_FAIL_ON" ]; then
+          args+=(--fail-on "$NYXOR_FAIL_ON")
+        fi
 
         uv tool run --python 3.13 \
           --from "nyxor @ git+https://github.com/ivnovomi/nyxor@${NYXOR_REF}" \
           "${args[@]}" | tee nyxor-audit.log
+        audit_exit=${PIPESTATUS[0]}
 
         # Rich may wrap the "(grade X)" line across two lines in a narrow
         # terminal — join everything before matching so the grade is found
@@ -92,6 +116,12 @@ runs:
           grade="unknown"
         fi
         echo "grade=$grade" >> "$GITHUB_OUTPUT"
+
+        if [ -n "$NYXOR_FAIL_ON" ] && [ "$audit_exit" -ne 0 ]; then
+          echo "exceeded=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exceeded=false" >> "$GITHUB_OUTPUT"
+        fi
 
         {
           echo "### NYXOR audit — $NYXOR_TARGET"
@@ -118,3 +148,12 @@ runs:
         <sub>via [nyxor](https://github.com/ivnovomi/nyxor)</sub>"
 
         gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$body"
+
+    - name: Enforce fail-on
+      if: inputs.fail-on != '' && steps.audit.outputs.exceeded == 'true'
+      shell: bash
+      env:
+        NYXOR_FAIL_ON: ${{ inputs.fail-on }}
+      run: |
+        echo "::error::--fail-on ${NYXOR_FAIL_ON}: at least one ${NYXOR_FAIL_ON}-or-worse finding was found."
+        exit 1
