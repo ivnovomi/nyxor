@@ -2,6 +2,53 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.3.0 — NyxScript v3, editor tooling, and a live website
+
+### NyxScript v3
+- User-defined functions (`func`/`return`), with real recursion (200-frame
+  cap) and a call-stack-based local scope.
+- `import "lib.nyx" as alias` — load another script's top-level functions
+  and constants as a namespaced module. Library functions resolve sibling
+  calls against their own *home* scope regardless of who imports them.
+  Circular imports are detected; import depth is capped.
+- `while`/`break`/`continue` (1,000,000-iteration safety cap on `while`).
+- List indexing (`list[i]`) and a real `.attr` postfix operator, so
+  `result[0].findings[0].severity` works on actual scan-result objects.
+- 19 pure builtin functions (`len`, `range`, `upper`, `join`, `sorted`, ...)
+  and an interactive `ui.*` module (`confirm`/`input`/`select`/`table`/
+  `banner`/`status`) built on Rich — the same implementation works from
+  the CLI (blocks normally) and the TUI (hands the terminal back via
+  `App.suspend()` for the prompt, then restores the dashboard).
+- Docstrings: a bare string as a function's first statement, a no-op at
+  runtime, surfaced by the LSP.
+- Fixed a linter false-positive where a function referencing an import
+  alias or module-level variable from its enclosing scope was flagged as
+  undefined, despite running fine.
+- Full language reference: `docs/nyxscript.md`.
+
+### Editor tooling
+- **TUI**: real auto-indent (indent after `:`, `end`/`else` snap back to
+  the enclosing level), line numbers, smart backspace (deletes a full
+  indent level), a less trigger-happy completion popup, and a visual
+  file browser for opening scripts.
+- **LSP / VS Code**: hover shows a function's real signature and
+  docstring — including through an import alias, resolved cross-file —
+  go-to-definition jumps to the `func` line, and `import "` completes
+  with `.nyx` files in the workspace. Syntax highlighting updated for
+  the full v3 grammar.
+
+### Website
+- Deployed for real: `https://ivnovomi.github.io/nyxor/` now serves the
+  actual marketing site instead of GitHub Pages' default Jekyll theme.
+- A custom hand-drawn brand mark, an editorial two-column feature index,
+  and a warm-paper palette with a single accent.
+
+### Fixes
+- `cloud-demo.yml` and `action.yml` had a literal `${{ }}` inside a
+  `run:` comment — GitHub Actions tries to parse that as an expression
+  even inside a comment, so an empty one failed the whole workflow file
+  at zero jobs scheduled, silently, since the file was first added.
+
 ## 0.2.0 — REST API, Cloud, and three new plugins
 
 ### REST API
