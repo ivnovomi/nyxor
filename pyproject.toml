@@ -87,6 +87,7 @@ analyze = "nyxor.plugins.analyze.plugin:PLUGIN"
 ask = "nyxor.plugins.ask.plugin:PLUGIN"
 recon = "nyxor.plugins.recon.plugin:PLUGIN"
 matrix = "nyxor.plugins.matrix.plugin:PLUGIN"
+flex = "nyxor.plugins.flex.plugin:PLUGIN"
 hostcheck = "nyxor.plugins.hostcheck.plugin:PLUGIN"
 mcp_cmd = "nyxor.plugins.mcp_cmd.plugin:PLUGIN"
 

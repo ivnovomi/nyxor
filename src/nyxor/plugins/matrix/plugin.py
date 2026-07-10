@@ -8,6 +8,7 @@ because "let's be hackers, as a joke" was an explicit request. `--duration
 
 from __future__ import annotations
 
+import colorsys
 import random
 import time
 
@@ -27,7 +28,14 @@ def _random_glyph() -> str:
     return random.choice(_GLYPHS)
 
 
-def _make_frame(width: int, height: int, heads: list[int]) -> Text:
+def _hue_to_hex(hue: float) -> str:
+    r, g, b = colorsys.hsv_to_rgb(hue % 1.0, 0.9, 1.0)
+    return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
+
+
+def _make_frame(
+    width: int, height: int, heads: list[int], *, rainbow: bool = False, hue_offset: float = 0.0
+) -> Text:
     frame = Text()
     for row in range(height):
         for col in range(width):
@@ -35,7 +43,19 @@ def _make_frame(width: int, height: int, heads: list[int]) -> Text:
             if distance == 0:
                 frame.append(_random_glyph(), style="bold white")
             elif 0 < distance <= _TRAIL_LENGTH:
-                style = "bold green" if distance <= 3 else "green" if distance <= 8 else "dim green"
+                if rainbow:
+                    hue = (col / max(width - 1, 1)) + hue_offset
+                    color = _hue_to_hex(hue)
+                    if distance <= 3:
+                        style = f"bold {color}"
+                    elif distance <= 8:
+                        style = color
+                    else:
+                        style = f"dim {color}"
+                else:
+                    style = (
+                        "bold green" if distance <= 3 else "green" if distance <= 8 else "dim green"
+                    )
                 frame.append(_random_glyph(), style=style)
             else:
                 frame.append(" ")
@@ -47,6 +67,9 @@ def _make_frame(width: int, height: int, heads: list[int]) -> Text:
 def _matrix(
     ctx: typer.Context,
     duration: float = typer.Option(6.0, "--duration", help="Seconds to run — 0 runs until Ctrl+C."),
+    rainbow: bool = typer.Option(
+        False, "--rainbow", help="Cycle the trail through a moving RGB rainbow instead of green."
+    ),
 ) -> None:
     """A Matrix-rain easter egg. Not a scan, not a security feature — just for fun."""
     context: NyxorContext = ctx.obj
@@ -62,14 +85,18 @@ def _matrix(
     speeds = [random.choice((1, 1, 1, 2)) for _ in range(width)]
 
     start = time.monotonic()
+    hue_offset = 0.0
     try:
         with Live(console=console, refresh_per_second=_FPS, screen=True) as live:
             while duration <= 0 or time.monotonic() - start < duration:
-                live.update(_make_frame(width, height, heads))
+                live.update(
+                    _make_frame(width, height, heads, rainbow=rainbow, hue_offset=hue_offset)
+                )
                 for i in range(width):
                     heads[i] += speeds[i]
                     if heads[i] - height > _TRAIL_LENGTH:
                         heads[i] = random.randint(-height, 0)
+                hue_offset += 0.01
                 time.sleep(1 / _FPS)
     except KeyboardInterrupt:
         pass

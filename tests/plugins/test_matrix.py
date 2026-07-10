@@ -35,3 +35,10 @@ def test_make_frame_trail_extends_above_the_head_and_nothing_below() -> None:
 def test_make_frame_head_off_screen_renders_an_all_blank_frame() -> None:
     frame = _make_frame(width=4, height=4, heads=[-100] * 4)
     assert frame.plain == (" " * 4 + "\n") * 3 + " " * 4
+
+
+def test_make_frame_rainbow_mode_has_the_same_shape_as_default() -> None:
+    frame = _make_frame(width=10, height=5, heads=[3] * 10, rainbow=True, hue_offset=0.3)
+    lines = frame.plain.splitlines()
+    assert len(lines) == 5
+    assert all(len(line) == 10 for line in lines)
