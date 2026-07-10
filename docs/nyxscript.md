@@ -268,8 +268,8 @@ save VAR to "path.ext"
 ```
 
 `VAR` must hold scan results (from `run ... as VAR`). The output format is
-inferred from the extension: `.json`, `.md`/`.markdown`, `.html`/`.htm`
-(anything else defaults to JSON).
+inferred from the extension: `.json`, `.md`/`.markdown`, `.html`/`.htm`,
+`.sarif` (anything else defaults to JSON).
 
 ## Functions
 

@@ -8,11 +8,13 @@ from nyxor.core.reporting.document import ReportDocument
 from nyxor.core.reporting.html_writer import HtmlReportWriter
 from nyxor.core.reporting.json_writer import JsonReportWriter
 from nyxor.core.reporting.markdown_writer import MarkdownReportWriter
+from nyxor.core.reporting.sarif_writer import SarifReportWriter
 
 WRITERS: dict[str, type[ReportWriter]] = {
     "json": JsonReportWriter,
     "markdown": MarkdownReportWriter,
     "html": HtmlReportWriter,
+    "sarif": SarifReportWriter,
 }
 
 
@@ -32,6 +34,7 @@ __all__ = [
     "JsonReportWriter",
     "MarkdownReportWriter",
     "HtmlReportWriter",
+    "SarifReportWriter",
     "get_writer",
     "WRITERS",
 ]

@@ -24,7 +24,7 @@ def convert(
     input_path: Path = typer.Argument(
         ..., help="A JSON report previously written with --output foo.json"
     ),
-    to: str = typer.Option("html", "--to", help="Target format: json, markdown, or html."),
+    to: str = typer.Option("html", "--to", help="Target format: json, markdown, html, or sarif."),
     output: Path = typer.Option(..., "--output", "-o", help="Where to write the converted report."),
 ) -> None:
     """Convert a saved JSON report into another format."""

@@ -80,6 +80,7 @@ _FORMAT_BY_SUFFIX = {
     "markdown": "markdown",
     "html": "html",
     "htm": "html",
+    "sarif": "sarif",
 }
 
 _BIN_OPS: dict[str, Callable[[Any, Any], Any]] = {

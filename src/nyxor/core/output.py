@@ -33,6 +33,7 @@ _SUFFIX_FORMATS = {
     ".markdown": "markdown",
     ".html": "html",
     ".htm": "html",
+    ".sarif": "sarif",
 }
 
 

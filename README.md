@@ -325,8 +325,28 @@ Outputs a `grade` (`A+` down to `F`) you can gate on, writes an HTML
 report and an SVG badge as build artifacts, drops a summary into the
 job's Actions tab, and — on a `pull_request` event, if the calling
 workflow grants `pull-requests: write` — posts the grade as a PR comment
-automatically (`pr-comment: "false"` to opt out). See
-[action.yml](action.yml) for every input, and
+automatically (`pr-comment: "false"` to opt out).
+
+Point `report-path` at a `.sarif` file instead of `.html` and feed it
+straight to GitHub's own uploader — findings show up as native alerts in
+the repo's **Security → Code scanning** tab, the same place CodeQL
+results land:
+
+```yaml
+permissions:
+  security-events: write   # required by upload-sarif
+
+steps:
+  - uses: ivnovomi/nyxor@v1
+    with:
+      target: example.com
+      report-path: results.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    with:
+      sarif_file: results.sarif
+```
+
+See [action.yml](action.yml) for every input, and
 [.github/workflows/cloud-demo.yml](.github/workflows/cloud-demo.yml) for
 a working example that runs on a schedule and commits the result.
 
@@ -557,7 +577,7 @@ Every command accepts:
 | `--verbose` / `-v` | Debug-level structured logging |
 | `--json` | Emit machine-readable JSON to stdout |
 | `--yaml` | Emit YAML to stdout |
-| `--output PATH` / `-o` | Write a report to a file (format inferred from extension: `.json`, `.md`, `.html`) |
+| `--output PATH` / `-o` | Write a report to a file (format inferred from extension: `.json`, `.md`, `.html`, `.sarif`) |
 | `--profile NAME` / `-p` | Apply a named configuration profile |
 
 ## Configuration
