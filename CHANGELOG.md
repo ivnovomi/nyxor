@@ -2,6 +2,14 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.3.6 — Hotfix: audit crashing on redirects
+
+- `nyx audit` crashed on any target that redirects (e.g. bare domain ->
+  `www`) with `1 validation error for Finding — evidence: Input should
+  be a valid dictionary`. The "Redirect chain" finding was passed the
+  raw redirect-chain list where `Finding.evidence` expects a dict; it's
+  now wrapped as `{"hops": [...]}`.
+
 ## 0.3.5 — Recon, host hygiene, MCP server, and a Claude Skill
 
 ### New plugins
