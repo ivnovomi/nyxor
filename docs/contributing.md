@@ -1,5 +1,26 @@
 # Contributing
 
+## How this project is built
+
+NYXOR is built with [Claude Code](https://claude.com/claude-code) as a
+development tool — a lot of the code, tests, and docs in this repo were
+written with an AI pair-programmer, and the commit history says so
+(`Co-Authored-By: Claude` on the commits where that's true). That's not
+a footnote, it's just how this project is made.
+
+What that doesn't change: every feature here exists because I decided it
+should — what to build, what to cut, what "done" means, what ships and
+what doesn't. Every change is reviewed and, wherever it's practical, run
+for real against real targets before I call it finished — that's why the
+commit history is full of "verified live against X" rather than "looks
+right." An AI pair-programmer is fast at writing code and bad at knowing
+what's actually worth building; that half stays mine.
+
+If you don't like that this project was built this way, that's a
+reasonable position to hold — but judge it by what's in the repo: the
+tests, the CI, whether the thing actually works when you run it. That's
+true regardless of how any individual line got typed.
+
 ## Setup
 
 ```bash

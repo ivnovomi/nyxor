@@ -44,6 +44,9 @@ For people who scroll instead of read:
 - 24 commands, actually organized: `nyx --help` groups everything into
   named panels (Scanning, AI, Automation, ...) instead of one giant
   alphabet-soup list.
+- **Built with Claude Code as a pair-programmer** — no secret about it,
+  see [how](docs/contributing.md#how-this-project-is-built). Judge it by
+  the tests and whether it actually works, same as any other project.
 
 Not convinced yet? Keep scrolling — there's a Matrix-rain easter egg
 (`nyx matrix`) that does absolutely nothing useful and we kept it anyway.
