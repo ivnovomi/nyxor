@@ -49,10 +49,11 @@ class InventoryPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("list", "export", "clear"),
+        category="Dashboard & Reports",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.add_typer(inventory_app)
+        app.add_typer(inventory_app, rich_help_panel=self.metadata.category)
 
 
 PLUGIN = InventoryPlugin()

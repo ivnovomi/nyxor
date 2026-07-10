@@ -141,6 +141,22 @@ def _dns_record(f: Finding) -> str:
     return f"{f.description} — routine DNS bookkeeping, not a security finding by itself."
 
 
+def _detected_technology(f: Finding) -> str:
+    return (
+        f"Passive fingerprinting picked up: {f.description}. Read from response headers, "
+        "cookie names, and page markup — nothing was probed or guessed at, so treat it as "
+        "a hint, not a certainty (sites can and do hide what they run)."
+    )
+
+
+def _cdn_waf(f: Finding) -> str:
+    return (
+        f"Traffic to this site passes through: {f.description}. That's the service sitting "
+        "in front of the real server, caching content and often filtering out obviously "
+        "malicious requests before they ever reach it."
+    )
+
+
 _EXPLAINERS: list[tuple[str, ExplainFn]] = [
     ("dnssec", _dnssec),
     ("spf record", _spf),
@@ -154,6 +170,8 @@ _EXPLAINERS: list[tuple[str, ExplainFn]] = [
     ("redirect chain", _redirect),
     ("response status", _response_status),
     ("compression", _compression),
+    ("detected technology", _detected_technology),
+    ("cdn / waf", _cdn_waf),
     ("record(s)", _dns_record),
 ]
 

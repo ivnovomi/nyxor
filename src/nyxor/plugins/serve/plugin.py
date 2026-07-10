@@ -40,10 +40,11 @@ class ServePlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("serve",),
+        category="API",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("serve")(_serve)
+        app.command("serve", rich_help_panel=self.metadata.category)(_serve)
 
 
 PLUGIN = ServePlugin()

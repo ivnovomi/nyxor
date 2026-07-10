@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import typer
+from rich.markup import escape as escape_markup
 from rich.table import Table
 from rich.text import Text
 
@@ -22,6 +23,7 @@ from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import ModuleResult, Severity
 from nyxor.core.output import SEVERITY_STYLE, emit_results
 from nyxor.core.scoring import render_badge, render_terminal_badge, score_results
+from nyxor.plugins.analyze.advisor import dumber_writeup, fix_suggestions
 from nyxor.plugins.dns_.plugin import run_lookup as dns_run_lookup
 from nyxor.plugins.http_.plugin import run_inspect as http_run_inspect
 from nyxor.plugins.inventory.store import InventoryStore
@@ -40,7 +42,11 @@ def _hostname_for_dns(domain: str) -> str:
     """
     if "://" in domain:
         return urlsplit(domain).hostname or domain
-    return domain.split(":", 1)[0]
+    if domain.startswith("[") and "]" in domain:
+        return domain[1 : domain.index("]")]
+    if domain.count(":") == 1:
+        return domain.split(":", 1)[0]
+    return domain
 
 
 async def run_audit(domain: str, config: NyxorConfig) -> list[ModuleResult]:
@@ -61,7 +67,7 @@ def _print_summary(context: NyxorContext, domain: str, results: list[ModuleResul
 
     grade_text = f"grade [{score.color}]{score.grade}[/] ({score.points}/100)"
     table = Table(
-        title=f"Audit summary — {domain}  ·  {grade_text}",
+        title=f"Audit summary — {escape_markup(domain)}  ·  {grade_text}",
         show_header=True,
         header_style="bold",
     )
@@ -81,18 +87,68 @@ def _print_summary(context: NyxorContext, domain: str, results: list[ModuleResul
     context.console.print(table)
 
 
-def _print_dumber(context: NyxorContext, results: list[ModuleResult]) -> None:
+async def _print_dumber(
+    context: NyxorContext, domain: str, results: list[ModuleResult], *, no_local: bool
+) -> None:
     console = context.console
     console.print()
     console.rule("[bold]Plain-English rundown[/bold] (no jargon, promise)")
+
+    ai_config = context.config.ai
+    ai_text = (
+        None
+        if no_local
+        else await dumber_writeup(
+            domain,
+            results,
+            host=ai_config.ollama_host,
+            model=ai_config.model,
+            timeout_seconds=ai_config.timeout_seconds,
+        )
+    )
+
+    if ai_text is not None:
+        console.print(f"[dim](written by local model: {ai_config.model})[/dim]\n")
+        # ai_text is model-generated free text — escape it the same as any
+        # other text sourced from outside NYXOR's own hardcoded strings.
+        console.print(escape_markup(ai_text))
+        console.print()
+        return
+
     for result in results:
         if not result.findings:
             continue
         console.print(f"\n[bold #7ee7e1]{result.module}[/]")
         for finding in result.findings:
             style = SEVERITY_STYLE[finding.severity]
-            console.print(f"  [{style}]●[/] [bold]{finding.title}[/]")
-            console.print(f"    {explain(finding)}", style="dim")
+            # finding.title and explain()'s output both embed text sourced
+            # from the scanned target — escape so a literal "[" in it can't
+            # be parsed as a Rich style tag.
+            console.print(f"  [{style}]●[/] [bold]{escape_markup(finding.title)}[/]")
+            console.print(f"    {escape_markup(explain(finding))}", style="dim")
+    console.print()
+
+
+async def _print_fix_suggestions(
+    context: NyxorContext, results: list[ModuleResult], *, no_local: bool
+) -> None:
+    console = context.console
+    if no_local:
+        return
+
+    ai_config = context.config.ai
+    console.print()
+    console.rule("[bold]Suggested fixes[/bold] (local model)")
+    text = await fix_suggestions(
+        results,
+        host=ai_config.ollama_host,
+        model=ai_config.model,
+        timeout_seconds=ai_config.timeout_seconds,
+    )
+    if text is None:
+        console.print("[dim]No local model reachable, or nothing medium-or-worse to fix.[/dim]")
+        return
+    console.print(escape_markup(text))
     console.print()
 
 
@@ -104,7 +160,20 @@ def _audit(
         None, "--badge", help="Write a shields.io-style security grade SVG badge to this path."
     ),
     dumber: bool = typer.Option(
-        False, "--dumber", help="Explain every finding in plain, no-jargon language."
+        False,
+        "--dumber",
+        help="Explain every finding in plain, no-jargon language "
+        "(uses a local model if one is reachable, template fallback otherwise).",
+    ),
+    fix_suggestions_flag: bool = typer.Option(
+        False,
+        "--fix-suggestions",
+        help="Ask a local model for concrete remediation steps on medium+ findings.",
+    ),
+    no_local: bool = typer.Option(
+        False,
+        "--no-local",
+        help="Skip the local model for --dumber/--fix-suggestions (templates/skip instead).",
     ),
 ) -> None:
     """Run a combined DNS + TLS + HTTP audit against a domain."""
@@ -124,7 +193,9 @@ def _audit(
     if context.output.format == "table" and context.output.output_path is None:
         _print_summary(context, domain, results)
         if dumber:
-            _print_dumber(context, results)
+            asyncio.run(_print_dumber(context, domain, results, no_local=no_local))
+        if fix_suggestions_flag:
+            asyncio.run(_print_fix_suggestions(context, results, no_local=no_local))
     emit_results(context, results, title=f"NYXOR Audit — {domain}")
 
 
@@ -135,10 +206,11 @@ class AuditPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("audit",),
+        category="Scanning",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("audit")(_audit)
+        app.command("audit", rich_help_panel=self.metadata.category)(_audit)
 
 
 PLUGIN = AuditPlugin()

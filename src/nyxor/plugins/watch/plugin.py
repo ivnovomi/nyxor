@@ -12,10 +12,12 @@ import asyncio
 from datetime import datetime
 
 import typer
+from rich.markup import escape as escape_markup
 
 from nyxor.core.context import NyxorContext
 from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.scoring import render_terminal_badge, score_results
+from nyxor.plugins.analyze.advisor import watch_narration
 from nyxor.plugins.audit.plugin import run_audit
 
 MIN_INTERVAL_SECONDS = 5.0
@@ -25,10 +27,12 @@ MIN_INTERVAL_SECONDS = 5.0
 Fingerprint = tuple[str, str, str]
 
 
-async def _watch_loop(domain: str, context: NyxorContext, interval: float, iterations: int) -> None:
+async def _watch_loop(
+    domain: str, context: NyxorContext, interval: float, iterations: int, *, narrate: bool
+) -> None:
     console = context.console
     console.print(
-        f"[bold #7ee7e1]Watching[/] {domain} every {interval:.0f}s "
+        f"[bold #7ee7e1]Watching[/] {escape_markup(domain)} every {interval:.0f}s "
         f"({iterations or '∞'} check(s)). Ctrl+C to stop."
     )
 
@@ -67,11 +71,32 @@ async def _watch_loop(domain: str, context: NyxorContext, interval: float, itera
                         render_terminal_badge(score, label="grade"),
                     )
                 for module, title, description in new:
+                    # title/description are finding text sourced from the
+                    # scanned target — escape so a literal "[" in them can't
+                    # be parsed as a Rich style tag.
                     console.print(
-                        f"{timestamp} [bold #ff4d6d]NEW[/] [{module}] {title} — {description}"
+                        f"{timestamp} [bold #ff4d6d]NEW[/] [{module}] "
+                        f"{escape_markup(title)} — {escape_markup(description)}"
                     )
                 for module, title, _description in resolved:
-                    console.print(f"{timestamp} [bold #2ecc71]RESOLVED[/] [{module}] {title}")
+                    console.print(
+                        f"{timestamp} [bold #2ecc71]RESOLVED[/] [{module}] {escape_markup(title)}"
+                    )
+
+                if narrate and previous_grade is not None:
+                    ai_config = context.config.ai
+                    narration = await watch_narration(
+                        domain,
+                        grade=score.grade,
+                        previous_grade=previous_grade,
+                        new=list(new),
+                        resolved=list(resolved),
+                        host=ai_config.ollama_host,
+                        model=ai_config.model,
+                        timeout_seconds=ai_config.timeout_seconds,
+                    )
+                    if narration:
+                        console.print(f"{timestamp} [bold #7ee7e1]»[/] {escape_markup(narration)}")
 
         previous = current
         previous_grade = score.grade
@@ -86,6 +111,11 @@ def _watch(
     domain: str,
     interval: float = typer.Option(300.0, "--interval", help="Seconds between checks."),
     iterations: int = typer.Option(0, "--iterations", help="Stop after N checks (0 = forever)."),
+    narrate: bool = typer.Option(
+        False,
+        "--narrate",
+        help="On a change, ask a local model for a one-line plain-English narration.",
+    ),
 ) -> None:
     """Continuously audit a domain and report only what changes."""
     context: NyxorContext = ctx.obj
@@ -93,7 +123,7 @@ def _watch(
         raise typer.BadParameter(f"--interval must be >= {MIN_INTERVAL_SECONDS:.0f}s.")
 
     try:
-        asyncio.run(_watch_loop(domain, context, interval, iterations))
+        asyncio.run(_watch_loop(domain, context, interval, iterations, narrate=narrate))
     except KeyboardInterrupt:
         context.console.print("\n[dim]Stopped.[/]")
 
@@ -105,10 +135,11 @@ class WatchPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("watch",),
+        category="Continuous & History",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("watch")(_watch)
+        app.command("watch", rich_help_panel=self.metadata.category)(_watch)
 
 
 PLUGIN = WatchPlugin()

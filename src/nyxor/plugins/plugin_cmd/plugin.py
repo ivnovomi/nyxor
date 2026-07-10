@@ -68,10 +68,11 @@ class PluginManagementPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("list", "info"),
+        category="Setup & Config",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.add_typer(plugin_app)
+        app.add_typer(plugin_app, rich_help_panel=self.metadata.category)
 
 
 PLUGIN = PluginManagementPlugin()

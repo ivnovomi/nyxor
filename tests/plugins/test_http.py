@@ -61,6 +61,8 @@ async def test_run_inspect_builds_a_valid_finding_for_a_redirect_chain(monkeypat
             "content_encoding": None,
             "cookies": [],
             "missing_security_headers": [],
+            "technologies": [],
+            "cdn_waf": [],
         }
 
     monkeypatch.setattr(http_plugin, "inspect", fake_inspect)

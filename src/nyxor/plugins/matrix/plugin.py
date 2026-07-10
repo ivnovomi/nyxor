@@ -87,10 +87,11 @@ class MatrixPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("matrix",),
+        category="Fun",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("matrix")(_matrix)
+        app.command("matrix", rich_help_panel=self.metadata.category)(_matrix)
 
 
 PLUGIN = MatrixPlugin()

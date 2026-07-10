@@ -59,6 +59,30 @@ async def run_inspect(url: str, config: HttpConfig) -> ModuleResult:
             )
         )
 
+    if info["technologies"]:
+        result.findings.append(
+            Finding(
+                title="Detected technology",
+                severity=Severity.INFO,
+                target=url,
+                description=", ".join(info["technologies"]),
+                evidence={"technologies": info["technologies"]},
+                tags=("fingerprint",),
+            )
+        )
+
+    if info["cdn_waf"]:
+        result.findings.append(
+            Finding(
+                title="CDN / WAF",
+                severity=Severity.INFO,
+                target=url,
+                description=", ".join(info["cdn_waf"]),
+                evidence={"cdn_waf": info["cdn_waf"]},
+                tags=("fingerprint",),
+            )
+        )
+
     if info["content_encoding"]:
         result.findings.append(
             Finding(
@@ -129,10 +153,11 @@ class HttpPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("inspect",),
+        category="Scanning",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.add_typer(http_app)
+        app.add_typer(http_app, rich_help_panel=self.metadata.category)
 
 
 PLUGIN = HttpPlugin()

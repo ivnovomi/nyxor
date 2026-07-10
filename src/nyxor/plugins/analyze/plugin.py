@@ -81,10 +81,11 @@ class AnalyzePlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("analyze",),
+        category="AI (local model)",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("analyze")(_analyze)
+        app.command("analyze", rich_help_panel=self.metadata.category)(_analyze)
 
 
 PLUGIN = AnalyzePlugin()

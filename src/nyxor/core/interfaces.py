@@ -29,6 +29,11 @@ class PluginMetadata(BaseModel):
     version: str
     author: str
     commands: tuple[str, ...] = ()
+    #: Groups this plugin's command(s) under a named panel in `nyx --help`
+    #: (via Typer's ``rich_help_panel``) — purely cosmetic, no effect on
+    #: behavior. Third-party plugins that don't set one fall back to
+    #: "General" rather than being left out of any group.
+    category: str = "General"
 
 
 @runtime_checkable

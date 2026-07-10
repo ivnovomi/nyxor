@@ -12,6 +12,7 @@ import json
 
 import yaml
 from rich.console import Console
+from rich.markup import escape as escape_markup
 from rich.table import Table
 
 from nyxor.core.context import NyxorContext
@@ -72,7 +73,13 @@ def _print_table(console: Console, results: list[ModuleResult]) -> None:
         table.add_column("Description")
         for finding in result.findings:
             style = SEVERITY_STYLE[finding.severity]
+            # title/description come from the scanned target (a TCP banner,
+            # a DNS TXT record, an HTTP header, ...) — escape them so a
+            # literal "[" in that data can't be parsed as a Rich style tag
+            # and silently swallowed (or worse, used to inject fake styling).
             table.add_row(
-                f"[{style}]{finding.severity.value}[/]", finding.title, finding.description
+                f"[{style}]{finding.severity.value}[/]",
+                escape_markup(finding.title),
+                escape_markup(finding.description),
             )
         console.print(table)

@@ -77,10 +77,11 @@ class ConfigPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("show", "path", "init"),
+        category="Setup & Config",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.add_typer(config_app)
+        app.add_typer(config_app, rich_help_panel=self.metadata.category)
 
 
 PLUGIN = ConfigPlugin()

@@ -2,6 +2,54 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.5.0 — Passive fingerprinting, a Rich-markup bugfix sweep, and local AI
+
+### Passive tech-stack / CDN / WAF fingerprinting
+- `nyx http inspect` (and therefore `nyx audit`) now passively fingerprints
+  the target from data already fetched for the request — response headers,
+  cookie names, and page markup (including `<meta name="generator">`).
+  Zero extra requests, zero active probing. New findings: "Detected
+  technology" and "CDN / WAF".
+- New module: `core/explain.py` templates for both, so `--dumber` explains
+  them in plain language too.
+
+### Local AI, expanded (`nyx analyze`'s Ollama client, reused everywhere)
+- `nyx audit --dumber` now asks the local model (if reachable) for a
+  beginner-friendly, finding-by-finding writeup instead of the fixed
+  templates — falls back to the templates automatically if no model
+  answers.
+- `nyx audit --fix-suggestions`: concrete remediation steps for
+  medium-or-worse findings, from the local model.
+- `nyx watch --narrate`: on a grade change or new/resolved findings, a
+  one-line plain-English narration from the local model.
+- `nyx ask ["question"]`: chat with the local model about your recorded
+  `nyx audit`/`nyx trends` history — single-shot with a question, or an
+  interactive REPL with none.
+- All of the above are strictly additive and strictly local: same Ollama
+  client, your own GPU if Ollama is configured to use one, nothing sent
+  anywhere unless `--host` is pointed elsewhere. Every one degrades
+  gracefully (templates, a skipped section, or a clear error for `nyx ask`)
+  if no local model is running — nothing here can break a command that
+  worked fine without AI.
+
+### Bugfix sweep
+- **Rich was silently eating literal `[...]` text in almost every table and
+  status line** across the CLI — a TCP banner, a DNS TXT record, an HTTP
+  header value, a process name, anything containing a literal `[` got
+  parsed as a (nonexistent) Rich style tag and dropped. Fixed with
+  `rich.markup.escape()` everywhere externally-sourced text reaches a
+  `Console.print()`/`Table.add_row()`: the core table renderer, `nyx
+  hostcheck`, `nyx recon`, `nyx watch`, `nyx audit --dumber`, and
+  NyxScript's `ui.table`/`ui.banner`/`ui.status`.
+- **IPv6 targets were badly mangled.** `nyx tls inspect "[::1]:443"` built
+  a target string of `[::1]:443:443` (the whole bracket notation, port
+  suffix included, treated as one opaque "host"); `nyx audit "[::1]"`
+  truncated the DNS hostname down to a single `"["` character. Both
+  `_parse_target` (tls) and `_hostname_for_dns` (audit) now parse bracketed
+  IPv6 literals correctly and leave bare (unbracketed) IPv6 addresses with
+  more than one colon alone instead of misreading part of the address as a
+  port.
+
 ## 0.4.0 — NyxScript grows up: dicts, error handling, a REPL, and a stdlib
 
 ### NyxScript language

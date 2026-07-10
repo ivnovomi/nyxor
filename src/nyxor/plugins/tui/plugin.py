@@ -22,10 +22,11 @@ class TuiPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("tui",),
+        category="Dashboard & Reports",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("tui")(_tui)
+        app.command("tui", rich_help_panel=self.metadata.category)(_tui)
 
 
 PLUGIN = TuiPlugin()

@@ -40,10 +40,11 @@ class McpPlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("mcp",),
+        category="Automation",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("mcp")(_mcp)
+        app.command("mcp", rich_help_panel=self.metadata.category)(_mcp)
 
 
 PLUGIN = McpPlugin()

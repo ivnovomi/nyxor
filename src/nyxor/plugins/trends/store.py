@@ -55,6 +55,10 @@ class TrendStore:
             samples = samples[-limit:]
         return samples
 
+    def all_domains(self) -> dict[str, list[Sample]]:
+        """Every domain's recorded history — for tools that summarize across all of them."""
+        return self._load()
+
     def clear(self, domain: str) -> bool:
         data = self._load()
         if domain not in data:

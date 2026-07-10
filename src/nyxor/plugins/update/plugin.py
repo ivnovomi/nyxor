@@ -52,10 +52,11 @@ class UpdatePlugin:
         version="0.1.0",
         author="NYXOR",
         commands=("update",),
+        category="Setup & Config",
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:
-        app.command("update")(_update)
+        app.command("update", rich_help_panel=self.metadata.category)(_update)
 
 
 PLUGIN = UpdatePlugin()

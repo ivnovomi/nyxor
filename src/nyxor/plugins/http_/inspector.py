@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from nyxor.plugins.http_.fingerprint import fingerprint
+
 SECURITY_HEADERS = (
     "strict-transport-security",
     "content-security-policy",
@@ -57,6 +59,16 @@ async def inspect(
 
     missing_security_headers = [h for h in SECURITY_HEADERS if h not in lower_headers]
 
+    # `response.text` is already fully buffered in memory (a plain client.get(),
+    # not a stream) — reading it here for signature matching costs no extra
+    # request. Only the derived tech/CDN names go into the result; the raw
+    # body itself is never kept, so it can't bloat a JSON/HTML report.
+    try:
+        body = response.text
+    except Exception:  # undecodable body (binary response, bad charset, ...)
+        body = ""
+    fingerprint_result = fingerprint(headers, cookies, body)
+
     return {
         "final_url": str(response.url),
         "status_code": response.status_code,
@@ -66,4 +78,6 @@ async def inspect(
         "content_encoding": lower_headers.get("content-encoding"),
         "server": lower_headers.get("server"),
         "missing_security_headers": missing_security_headers,
+        "technologies": fingerprint_result["technologies"],
+        "cdn_waf": fingerprint_result["cdn_waf"],
     }
