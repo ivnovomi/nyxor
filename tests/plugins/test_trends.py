@@ -16,6 +16,16 @@ def test_trend_store_records_and_returns_history(tmp_path: Path) -> None:
     assert history[-1]["grade"] == "B"
 
 
+def test_trend_store_all_domains_returns_everything(tmp_path: Path) -> None:
+    store = TrendStore(path=tmp_path / "trends.json")
+    store.record("a.com", 90, "A-")
+    store.record("b.com", 50, "F")
+
+    everything = store.all_domains()
+    assert set(everything) == {"a.com", "b.com"}
+    assert everything["a.com"][0]["points"] == 90
+
+
 def test_trend_store_keeps_domains_separate(tmp_path: Path) -> None:
     store = TrendStore(path=tmp_path / "trends.json")
     store.record("a.com", 90, "A-")

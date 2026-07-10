@@ -14,6 +14,7 @@ import dns.asyncresolver
 import dns.exception
 import dns.resolver
 import typer
+from rich.markup import escape as escape_markup
 from rich.table import Table
 
 from nyxor.core.context import NyxorContext
@@ -118,7 +119,7 @@ def _print_summary(context: NyxorContext, domain: str, results: list[ModuleResul
             status = "[dim]historical[/]"
         else:
             status = "[dim]?[/]"
-        table.add_row(finding.title, status)
+        table.add_row(escape_markup(finding.title), status)
     context.console.print(table)
 
 

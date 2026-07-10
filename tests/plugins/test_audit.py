@@ -15,9 +15,13 @@ from nyxor.plugins.audit.plugin import _hostname_for_dns, run_audit
         ("https://example.com/", "example.com"),
         ("https://example.com:8443/path", "example.com"),
         ("http://example.com", "example.com"),
+        ("[::1]", "::1"),
+        ("2606:4700:10::6814:179a", "2606:4700:10::6814:179a"),
     ],
 )
 def test_hostname_for_dns(raw: str, expected: str) -> None:
+    # Regression: a bracketed IPv6 literal like "[::1]" used to get
+    # truncated to just "[" by a naive split(":", 1)[0].
     assert _hostname_for_dns(raw) == expected
 
 

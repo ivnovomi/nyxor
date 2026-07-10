@@ -16,6 +16,7 @@ import asyncio
 from typing import Any
 
 import typer
+from rich.markup import escape as escape_markup
 from rich.table import Table
 
 from nyxor.core.context import NyxorContext
@@ -118,7 +119,14 @@ def _print_summary(context: NyxorContext, result: ModuleResult) -> None:
     table.add_column("Finding")
     table.add_column("Detail")
     for finding in result.findings:
-        table.add_row(finding.severity.value.upper(), finding.title, finding.description)
+        # title/description embed a process name or autorun command a piece
+        # of malware chose — escape so a name like "[bold red]FAKE[/]" can't
+        # inject Rich markup into our own output.
+        table.add_row(
+            finding.severity.value.upper(),
+            escape_markup(finding.title),
+            escape_markup(finding.description),
+        )
     context.console.print(table)
     note = result.raw_data.get("note")
     if note:
@@ -140,7 +148,9 @@ def _kill_high_severity(context: NyxorContext, result: ModuleResult, *, yes: boo
             continue
         try:
             psutil.Process(pid).terminate()
-            context.console.print(f"[green]Terminated[/] PID {pid} ({finding.title})")
+            context.console.print(
+                f"[green]Terminated[/] PID {pid} ({escape_markup(finding.title)})"
+            )
         except psutil.NoSuchProcess:
             context.console.print(f"[dim]PID {pid} already gone.[/]")
         except psutil.AccessDenied:

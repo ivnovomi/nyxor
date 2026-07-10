@@ -59,6 +59,30 @@ async def run_inspect(url: str, config: HttpConfig) -> ModuleResult:
             )
         )
 
+    if info["technologies"]:
+        result.findings.append(
+            Finding(
+                title="Detected technology",
+                severity=Severity.INFO,
+                target=url,
+                description=", ".join(info["technologies"]),
+                evidence={"technologies": info["technologies"]},
+                tags=("fingerprint",),
+            )
+        )
+
+    if info["cdn_waf"]:
+        result.findings.append(
+            Finding(
+                title="CDN / WAF",
+                severity=Severity.INFO,
+                target=url,
+                description=", ".join(info["cdn_waf"]),
+                evidence={"cdn_waf": info["cdn_waf"]},
+                tags=("fingerprint",),
+            )
+        )
+
     if info["content_encoding"]:
         result.findings.append(
             Finding(

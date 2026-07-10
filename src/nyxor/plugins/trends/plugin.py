@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 
 import typer
+from rich.markup import escape as escape_markup
 
 from nyxor.core.context import NyxorContext
 from nyxor.core.interfaces import PluginMetadata
@@ -58,7 +59,9 @@ def show(
         "flat": "dim",
     }[stats.direction]
 
-    context.console.print(f"[bold]Trend — {domain}[/bold]  ({stats.n} run(s) considered)")
+    context.console.print(
+        f"[bold]Trend — {escape_markup(domain)}[/bold]  ({stats.n} run(s) considered)"
+    )
     context.console.print(f"  {stats.sparkline}")
     context.console.print(
         f"  mean {stats.mean:.1f}  ·  std {stats.std:.1f}  ·  range {stats.minimum}-{stats.maximum}"
@@ -83,9 +86,9 @@ def clear(ctx: typer.Context, domain: str) -> None:
     """Delete recorded history for a domain."""
     context: NyxorContext = ctx.obj
     if TrendStore().clear(domain):
-        context.console.print(f"[green]Cleared[/green] history for {domain}.")
+        context.console.print(f"[green]Cleared[/green] history for {escape_markup(domain)}.")
     else:
-        context.console.print(f"[dim]No history for {domain}.[/dim]")
+        context.console.print(f"[dim]No history for {escape_markup(domain)}.[/dim]")
 
 
 class TrendsPlugin:

@@ -1,6 +1,6 @@
 [project]
 name = "nyxor"
-version = "0.4.0"
+version = "0.5.0"
 description = "NYXOR — a modular, cross-platform security assessment and infrastructure auditing toolkit."
 readme = "README.md"
 authors = [
@@ -84,6 +84,7 @@ serve = "nyxor.plugins.serve.plugin:PLUGIN"
 auth = "nyxor.plugins.auth.plugin:PLUGIN"
 trends = "nyxor.plugins.trends.plugin:PLUGIN"
 analyze = "nyxor.plugins.analyze.plugin:PLUGIN"
+ask = "nyxor.plugins.ask.plugin:PLUGIN"
 recon = "nyxor.plugins.recon.plugin:PLUGIN"
 matrix = "nyxor.plugins.matrix.plugin:PLUGIN"
 hostcheck = "nyxor.plugins.hostcheck.plugin:PLUGIN"

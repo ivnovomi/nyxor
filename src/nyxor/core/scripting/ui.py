@@ -22,6 +22,7 @@ import asyncio
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
+from rich.markup import escape as escape_markup
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
@@ -71,22 +72,25 @@ class ScriptUI:
             raise TypeError("ui.table()'s arguments must both be lists")
         table = Table(show_header=True, header_style="bold")
         for header in headers:
-            table.add_column(str(header))
+            table.add_column(escape_markup(str(header)))
         for row in rows:
             if not isinstance(row, list):
                 raise TypeError("ui.table()'s rows must each be a list")
-            table.add_row(*(str(cell) for cell in row))
+            # A script commonly feeds scan-result data (a finding's title,
+            # a banner, a header value) through here — escape each cell so a
+            # literal "[" in that data can't be parsed as a Rich style tag.
+            table.add_row(*(escape_markup(str(cell)) for cell in row))
         self.console.print(table)
 
     async def banner(self, args: list[Any]) -> None:
         if len(args) != 1:
             raise TypeError("ui.banner() expects 1 argument (text)")
-        self.console.rule(f"[bold]{args[0]}[/bold]")
+        self.console.rule(f"[bold]{escape_markup(str(args[0]))}[/bold]")
 
     async def status(self, args: list[Any]) -> None:
         if len(args) != 1:
             raise TypeError("ui.status() expects 1 argument (message)")
-        self.console.print(f"[dim]…[/dim] {args[0]}")
+        self.console.print(f"[dim]…[/dim] {escape_markup(str(args[0]))}")
 
 
 #: Method names reachable as ``ui.<name>(...)`` from NyxScript.

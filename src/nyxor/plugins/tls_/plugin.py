@@ -28,10 +28,28 @@ def _parse_target(target: str) -> tuple[str, int]:
         parsed = urlsplit(target)
         if parsed.hostname:
             return parsed.hostname, parsed.port or 443
-    if ":" in target and not target.startswith("["):
+
+    # Bracketed IPv6 literal, e.g. "[::1]:443" or bare "[::1]" — pull the
+    # address out from between the brackets (unbracketed is what a socket
+    # connection wants) before even looking for a ":port" suffix, so it
+    # doesn't get treated as one big opaque hostname string port and all.
+    if target.startswith("["):
+        closing = target.find("]")
+        if closing != -1:
+            host = target[1:closing]
+            rest = target[closing + 1 :]
+            if rest.startswith(":") and rest[1:].isdigit():
+                return host, int(rest[1:])
+            return host, 443
+
+    # A bare (unbracketed) IPv6 address has multiple colons — only treat a
+    # single colon as a "host:port" separator, so "2606:4700::1" isn't
+    # mangled into host="2606" port(invalid).
+    if target.count(":") == 1:
         host, _, port_str = target.rpartition(":")
         if port_str.isdigit():
             return host, int(port_str)
+
     return target, 443
 
 
