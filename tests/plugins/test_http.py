@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from http.cookiejar import Cookie
 
+import pytest
+
+from nyxor.core.config import HttpConfig
+from nyxor.plugins.http_ import plugin as http_plugin
 from nyxor.plugins.http_.inspector import SECURITY_HEADERS, _describe_cookie
 
 
@@ -45,3 +49,25 @@ def test_describe_cookie_recognizes_set_attributes() -> None:
 def test_security_headers_cover_common_hardening_headers() -> None:
     assert "strict-transport-security" in SECURITY_HEADERS
     assert "content-security-policy" in SECURITY_HEADERS
+
+
+@pytest.mark.asyncio
+async def test_run_inspect_builds_a_valid_finding_for_a_redirect_chain(monkeypatch) -> None:
+    async def fake_inspect(url, timeout, follow_redirects, max_redirects):
+        return {
+            "status_code": 200,
+            "final_url": "https://www.example.com/",
+            "redirect_chain": [{"url": "https://example.com/", "status_code": 301}],
+            "content_encoding": None,
+            "cookies": [],
+            "missing_security_headers": [],
+        }
+
+    monkeypatch.setattr(http_plugin, "inspect", fake_inspect)
+
+    result = await http_plugin.run_inspect("https://example.com", HttpConfig())
+
+    redirect_finding = next(f for f in result.findings if f.title == "Redirect chain")
+    assert redirect_finding.evidence == {
+        "hops": [{"url": "https://example.com/", "status_code": 301}]
+    }

@@ -55,7 +55,7 @@ async def run_inspect(url: str, config: HttpConfig) -> ModuleResult:
                 severity=Severity.INFO,
                 target=url,
                 description=hops,
-                evidence=info["redirect_chain"],
+                evidence={"hops": info["redirect_chain"]},
             )
         )
 
