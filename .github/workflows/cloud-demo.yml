@@ -38,7 +38,11 @@ jobs:
         run: |
           set -euo pipefail
           # NYXOR_TARGET/NYXOR_GRADE arrive via env:, not spliced into this
-          # script by ${{ }} expansion — see action.yml for why that matters.
+          # script by GitHub's expression templating — see action.yml for
+          # why that matters. (Avoid writing a literal double-brace
+          # expression marker in a run: comment — GitHub tries to parse
+          # it as an expression even inside a comment, and an empty one
+          # fails the whole workflow with "An expression was expected".)
           git config user.name "nyxor-cloud[bot]"
           git config user.email "actions@users.noreply.github.com"
           git add cloud/

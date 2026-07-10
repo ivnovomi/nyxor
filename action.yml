@@ -56,9 +56,12 @@ runs:
         set -euo pipefail
 
         # Values above arrive via env: (not spliced into this script by
-        # ${{ }} expansion) so they're treated as inert data by bash, not
-        # as script text — a target/ref containing `$(...)` or backticks
-        # can't break out and run arbitrary commands on the runner.
+        # GitHub's expression templating) so they're treated as inert data
+        # by bash, not as script text — a target/ref containing `$(...)`
+        # or backticks can't break out and run arbitrary commands on the
+        # runner. (Don't write a literal double-brace expression marker in
+        # a run: comment — GitHub tries to parse it as an expression even
+        # inside a comment, and an empty one breaks the whole workflow.)
 
         args=(nyx)
         if [ -n "$NYXOR_REPORT_PATH" ]; then
