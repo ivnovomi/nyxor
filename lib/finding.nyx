@@ -1,0 +1,43 @@
+# NyxScoped lib...
+
+func count_by_severity(results, severity):
+    set count = 0
+
+    foreach r in results:
+        foreach f in r.findings:
+            if f.severity == severity:
+                set count = count + 1
+            end
+        end
+    end
+
+    return count
+end
+
+
+func total_findings(results):
+    set total = 0
+
+    foreach r in results:
+        set total = total + len(r.findings)
+    end
+
+    return total
+end
+
+func worst_severity(results):
+    set order = ["critical", "high", "medium", "low", "info"]
+    
+    foreach level in order:
+        if count_by_severity(results, level) > 0:
+            return level
+        end
+    end
+    return "info"
+end
+
+func summary_line(result, target):
+    set total = total_findings(result)
+    set worst = worst_severity(result)
+    return "{target}: {total} finding(s), worst severity: {worst}"
+end

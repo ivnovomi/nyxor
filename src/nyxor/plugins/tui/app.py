@@ -53,6 +53,7 @@ from nyxor.plugins.http_.plugin import run_inspect as http_run_inspect
 from nyxor.plugins.inventory.store import InventoryStore
 from nyxor.plugins.network.plugin import run_discover as network_run_discover
 from nyxor.plugins.network.plugin import run_scan as network_run_scan
+from nyxor.plugins.recon.plugin import run_recon
 from nyxor.plugins.system.doctor import run_diagnostics
 from nyxor.plugins.tls_.plugin import run_inspect as tls_run_inspect
 from nyxor.plugins.tui.browser import ScriptBrowserScreen
@@ -106,6 +107,7 @@ MODULE_CHOICES: list[tuple[str, str]] = [
     ("DNS — lookup", "dns.lookup"),
     ("TLS — inspect", "tls.inspect"),
     ("HTTP — inspect", "http.inspect"),
+    ("Recon — subdomains (passive)", "recon.subdomains"),
 ]
 
 
@@ -803,6 +805,8 @@ class NyxorApp(App[None]):
             return [await http_run_inspect(target, self.config.http)]
         if module == "audit.full":
             return await run_audit(target, self.config)
+        if module == "recon.subdomains":
+            return await run_recon(target)
         raise ValueError(f"Unknown module: {module}")
 
     # ------------------------------------------------------------------ #

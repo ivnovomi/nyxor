@@ -51,6 +51,12 @@ async def _run_network_scan(target: str, config: NyxorConfig) -> list[ModuleResu
     return [await run_scan(target, "", config.network)]
 
 
+async def _run_recon(target: str, config: NyxorConfig) -> list[ModuleResult]:
+    from nyxor.plugins.recon.plugin import run_recon
+
+    return await run_recon(target)
+
+
 MODULE_RUNNERS: dict[str, RunnerFn] = {
     "audit": _run_audit,
     "dns": _run_dns,
@@ -58,4 +64,5 @@ MODULE_RUNNERS: dict[str, RunnerFn] = {
     "http": _run_http,
     "network.discover": _run_network_discover,
     "network.scan": _run_network_scan,
+    "recon": _run_recon,
 }

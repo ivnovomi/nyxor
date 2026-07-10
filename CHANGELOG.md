@@ -2,6 +2,42 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.3.5 — Recon, host hygiene, MCP server, and a Claude Skill
+
+### New plugins
+- `nyx recon` — passive subdomain discovery via certificate transparency
+  logs (crt.sh), with optional DNS-based live/historical distinction.
+  100% passive: reads a public third-party log, never touches the target.
+- `nyx hostcheck` — passive local host hygiene checks: processes
+  masquerading as well-known Windows system binaries, autorun entries
+  pointing at temp/downloads-style paths, and an opt-in VirusTotal
+  hash-reputation lookup if you supply your own free API key. Not an
+  antivirus — no signatures, no real-time protection — and `--kill` only
+  ever acts on a finding you explicitly confirm, one process at a time.
+- `nyx matrix` — a cosmetic terminal screensaver. Explicitly not a
+  security feature.
+
+### MCP server and Claude Skill
+- `nyx mcp` starts NYXOR as an MCP server over stdio, exposing `audit`,
+  `dns_lookup`, `tls_inspect`, `http_inspect`, `recon`, `hostcheck`,
+  `lint_nyxscript`, and `run_nyxscript` as tools — all wrapping the exact
+  same `run_*()` coroutines the CLI/TUI/REST API use. Deliberately
+  narrower than the CLI: no `hostcheck --kill` and no `--unsafe`
+  NyxScript execution are reachable through it, since an MCP tool can be
+  invoked autonomously with no human confirming each call.
+- A Claude Skill for NyxScript (`.claude/skills/nyxscript/`) teaches
+  Claude the language so it can write, lint, and run `.nyx` scripts
+  correctly on the first try.
+
+### Fixes
+- `nyx audit "https://example.com/"` no longer crashes — target parsing
+  now uses `urlsplit()` for anything containing `://`, instead of a naive
+  `rpartition(":")` that read the scheme as the hostname.
+- Audit's DNS lookup now strips scheme/port from a full-URL target
+  before resolving, instead of silently querying the literal URL string.
+- `nyx hostcheck` no longer flags the legitimate `C:\Windows\explorer.exe`
+  as a HIGH-severity masquerading process.
+
 ## 0.3.0 — NyxScript v3, editor tooling, and a live website
 
 ### NyxScript v3

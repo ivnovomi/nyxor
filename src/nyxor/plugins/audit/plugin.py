@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import typer
 from rich.table import Table
@@ -28,10 +29,23 @@ from nyxor.plugins.tls_.plugin import run_inspect as tls_run_inspect
 _SEVERITY_ORDER = list(Severity)
 
 
+def _hostname_for_dns(domain: str) -> str:
+    """DNS needs a bare hostname — TLS/HTTP both accept a full URL
+
+    (`nyx audit https://example.com/` is meant to work, same as
+    `nyx http inspect` already does), but resolving the literal string
+    "https://example.com/" as a domain name doesn't, so pull the host back
+    out of it first.
+    """
+    if "://" in domain:
+        return urlsplit(domain).hostname or domain
+    return domain.split(":", 1)[0]
+
+
 async def run_audit(domain: str, config: NyxorConfig) -> list[ModuleResult]:
     """Run DNS, TLS, and HTTP checks against ``domain`` concurrently."""
     dns_result, tls_result, http_result = await asyncio.gather(
-        dns_run_lookup(domain, config.dns.resolvers, config.dns.timeout_seconds),
+        dns_run_lookup(_hostname_for_dns(domain), config.dns.resolvers, config.dns.timeout_seconds),
         tls_run_inspect(domain, config.tls.timeout_seconds),
         http_run_inspect(domain, config.http),
     )
