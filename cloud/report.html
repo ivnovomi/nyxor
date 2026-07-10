@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NYXOR Audit — example.com</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+  h1 { margin-bottom: 0.25rem; }
+  .meta { color: #666; margin-bottom: 1.5rem; }
+  .module { border: 1px solid #ddd; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+  table { border-collapse: collapse; width: 100%; margin-top: 0.5rem; }
+  th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+  .sev-critical { color: #b00020; font-weight: 600; }
+  .sev-high { color: #d16b00; font-weight: 600; }
+  .sev-medium { color: #a68b00; }
+  .sev-low { color: #2a6f2a; }
+  .sev-info { color: #555; }
+  .errors { color: #b00020; }
+</style>
+</head>
+<body>
+  <h1>NYXOR Audit — example.com</h1>
+  <div class="meta">
+    Generated 2026-07-10T01:25:49.591529+00:00
+    
+    &middot; 3 module run(s)
+    &middot; 17 finding(s)
+    &middot; 11 asset(s)
+  </div>
+
+  
+  <div class="module">
+    <h2>dns.lookup &mdash; example.com</h2>
+    
+    
+    <table>
+      <thead><tr><th>Severity</th><th>Title</th><th>Description</th></tr></thead>
+      <tbody>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>A record(s)</td>
+          <td>104.20.23.154, 172.66.147.243</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>AAAA record(s)</td>
+          <td>2606:4700:10::6814:179a, 2606:4700:10::ac42:93f3</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>MX record(s)</td>
+          <td>0 .</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>TXT record(s)</td>
+          <td>&#34;_k2n1y4vw3qtb4skdx9e7dxt97qrmmq9&#34;, &#34;v=spf1 -all&#34;</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>NS record(s)</td>
+          <td>elliott.ns.cloudflare.com., hera.ns.cloudflare.com.</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>SOA record(s)</td>
+          <td>elliott.ns.cloudflare.com. dns.cloudflare.com. 2407636105 10000 2400 604800 1800</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-medium">medium</td>
+          <td>DNSSEC</td>
+          <td>No DNSKEY record found — DNSSEC likely not enabled.</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>MX records</td>
+          <td></td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>SPF record</td>
+          <td>v=spf1 -all</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>DMARC record</td>
+          <td>v=DMARC1;p=reject;sp=reject;adkim=s;aspf=s</td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+    
+    <p><strong>Assets:</strong></p>
+    <ul><li><code>dns:a</code>: 104.20.23.154</li><li><code>dns:a</code>: 172.66.147.243</li><li><code>dns:aaaa</code>: 2606:4700:10::ac42:93f3</li><li><code>dns:aaaa</code>: 2606:4700:10::6814:179a</li><li><code>dns:mx</code>: 0 .</li><li><code>dns:txt</code>: &#34;_k2n1y4vw3qtb4skdx9e7dxt97qrmmq9&#34;</li><li><code>dns:txt</code>: &#34;v=spf1 -all&#34;</li><li><code>dns:ns</code>: hera.ns.cloudflare.com.</li><li><code>dns:ns</code>: elliott.ns.cloudflare.com.</li><li><code>dns:soa</code>: elliott.ns.cloudflare.com. dns.cloudflare.com. 2407636105 10000 2400 604800 1800</li></ul>
+    
+  </div>
+  
+  <div class="module">
+    <h2>tls.inspect &mdash; example.com:443</h2>
+    
+    
+    <table>
+      <thead><tr><th>Severity</th><th>Title</th><th>Description</th></tr></thead>
+      <tbody>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>Certificate expiration</td>
+          <td>Certificate valid for 50 more day(s).</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>Certificate subject</td>
+          <td>CN=example.com (issued by CN=Cloudflare TLS Issuing ECC CA 3,O=SSL Corporation,C=US)</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>Negotiated TLS protocol</td>
+          <td>TLSv1.3</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>Negotiated cipher</td>
+          <td>TLS_AES_256_GCM_SHA384 (256 bits)</td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+    
+    <p><strong>Assets:</strong></p>
+    <ul><li><code>tls_certificate</code>: example.com:443</li></ul>
+    
+  </div>
+  
+  <div class="module">
+    <h2>http.inspect &mdash; https://example.com</h2>
+    
+    
+    <table>
+      <thead><tr><th>Severity</th><th>Title</th><th>Description</th></tr></thead>
+      <tbody>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>Response status</td>
+          <td>200 from https://example.com</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-info">info</td>
+          <td>Compression</td>
+          <td>Content-Encoding: gzip</td>
+        </tr>
+        
+        <tr>
+          <td class="sev-medium">medium</td>
+          <td>Missing security headers</td>
+          <td>strict-transport-security, content-security-policy, x-content-type-options, x-frame-options, referrer-policy, permissions-policy</td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+    
+  </div>
+  
+</body>
+</html>

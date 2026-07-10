@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="172" height="20" role="img" aria-label="nyxor: example.com: B+">
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r"><rect width="172" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="137" height="20" fill="#2b2f3a"/>
+    <rect x="137" width="35" height="20" fill="#7ee7e1"/>
+    <rect width="172" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,sans-serif" font-size="11">
+    <text x="68.5" y="14">nyxor: example.com</text>
+    <text x="154.5" y="14">B+</text>
+  </g>
+</svg>
