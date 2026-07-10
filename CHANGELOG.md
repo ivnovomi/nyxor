@@ -2,6 +2,26 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.5.5 — Help on steroids, a hardened local-AI client, and a rewritten README
+
+- `nyx --help` now groups all 24 commands into named panels (Scanning, AI,
+  Automation, Host Security, ...) instead of one flat alphabetical list —
+  driven entirely by a `category` field on `PluginMetadata`, nothing
+  hand-maintained. Panels are sorted by a fixed priority list (Scanning
+  first) rather than whatever order plugin discovery happens to yield.
+- `generate()` (the Ollama client behind `nyx analyze`/`ask`/`--dumber`/
+  `--fix-suggestions`/`--narrate`) now folds *every* failure mode —
+  connection errors, bad statuses, timeouts, other transport errors, and
+  invalid/non-JSON response bodies — into `OllamaUnavailable`, so every
+  local-AI feature's "never crashes a command that would otherwise work
+  fine without AI" guarantee actually holds. (Found in code review: the
+  original version only handled three of the ways a request can fail.)
+- README rewritten top to bottom for everything shipped since 0.3.0:
+  passive fingerprinting, local AI, `nyx recon`/`hostcheck`/`ask`/`mcp`,
+  NyxScript's dicts/`try`-`except`/REPL/stdlib, and the grouped `--help`.
+  Added a TL;DR section up top for anyone who isn't going to read the
+  whole thing (no judgment).
+
 ## 0.5.0 — Passive fingerprinting, a Rich-markup bugfix sweep, and local AI
 
 ### Passive tech-stack / CDN / WAF fingerprinting
