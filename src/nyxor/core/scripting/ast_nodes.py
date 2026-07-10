@@ -20,6 +20,12 @@ class ListLiteral:
 
 
 @dataclass(frozen=True)
+class DictLiteral:
+    pairs: list[tuple[Expr, Expr]]
+    line: int
+
+
+@dataclass(frozen=True)
 class VarRef:
     name: str
     line: int
@@ -76,7 +82,7 @@ class Attr:
     line: int
 
 
-Expr = Literal | ListLiteral | VarRef | UnaryOp | BinOp | Call | Index | Attr
+Expr = Literal | ListLiteral | DictLiteral | VarRef | UnaryOp | BinOp | Call | Index | Attr
 
 # --- statements ------------------------------------------------------------
 
@@ -84,6 +90,21 @@ Expr = Literal | ListLiteral | VarRef | UnaryOp | BinOp | Call | Index | Attr
 @dataclass(frozen=True)
 class SetStmt:
     name: str
+    value: Expr
+    line: int
+
+
+@dataclass(frozen=True)
+class IndexSetStmt:
+    """``set NAME[index]... = expr`` — mutates a list or dict in place.
+
+    ``target`` is the container expression (evaluated normally, so nested
+    indexing like ``set d["a"]["b"] = 1`` works via the same postfix chain
+    the parser already builds for reads).
+    """
+
+    target: Expr
+    index: Expr
     value: Expr
     line: int
 
@@ -183,6 +204,20 @@ class ImportStmt:
 
 
 @dataclass(frozen=True)
+class TryStmt:
+    """``try: ... except VAR: ... end`` — catches a NyxScript runtime error.
+
+    ``error_var`` holds the failed statement's error message (a string) for
+    the duration of the ``except`` body only.
+    """
+
+    body: list[Stmt]
+    error_var: str
+    except_body: list[Stmt]
+    line: int
+
+
+@dataclass(frozen=True)
 class ExprStmt:
     """A bare call used for its side effect, e.g. ``ui.confirm("...")`` on its own line."""
 
@@ -221,6 +256,7 @@ class PipStmt:
 
 Stmt = (
     SetStmt
+    | IndexSetStmt
     | PrintStmt
     | SleepStmt
     | AssertStmt
@@ -235,6 +271,7 @@ Stmt = (
     | FuncDef
     | ReturnStmt
     | ImportStmt
+    | TryStmt
     | ExprStmt
     | DocStmt
     | PythonStmt

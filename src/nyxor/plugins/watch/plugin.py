@@ -15,7 +15,7 @@ import typer
 
 from nyxor.core.context import NyxorContext
 from nyxor.core.interfaces import PluginMetadata
-from nyxor.core.scoring import score_results
+from nyxor.core.scoring import render_terminal_badge, score_results
 from nyxor.plugins.audit.plugin import run_audit
 
 MIN_INTERVAL_SECONDS = 5.0
@@ -23,10 +23,6 @@ MIN_INTERVAL_SECONDS = 5.0
 # (module, finding title, finding description) — stable across runs, unlike
 # Finding.id which is a fresh UUID every time.
 Fingerprint = tuple[str, str, str]
-
-
-def _grade_markup(grade: str, color: str) -> str:
-    return f"[{color}]{grade}[/]"
 
 
 async def _watch_loop(domain: str, context: NyxorContext, interval: float, iterations: int) -> None:
@@ -53,8 +49,9 @@ async def _watch_loop(domain: str, context: NyxorContext, interval: float, itera
 
         if previous is None:
             console.print(
-                f"[dim]{timestamp}[/] baseline — grade {_grade_markup(score.grade, score.color)} "
-                f"({score.points}/100), {len(current)} finding(s)"
+                f"[dim]{timestamp}[/] baseline —",
+                render_terminal_badge(score, label="grade"),
+                f"({score.points}/100), {len(current)} finding(s)",
             )
         else:
             new = sorted(current - previous)
@@ -66,8 +63,8 @@ async def _watch_loop(domain: str, context: NyxorContext, interval: float, itera
             else:
                 if grade_changed:
                     console.print(
-                        f"{timestamp} [bold]grade:[/] {previous_grade} -> "
-                        f"{_grade_markup(score.grade, score.color)}"
+                        f"{timestamp} [bold]grade:[/] {previous_grade} ->",
+                        render_terminal_badge(score, label="grade"),
                     )
                 for module, title, description in new:
                     console.print(

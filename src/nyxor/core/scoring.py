@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from rich.text import Text
+
 from nyxor.core.models import ModuleResult, Severity
 
 _PENALTY: dict[Severity, int] = {
@@ -96,3 +98,17 @@ role="img" aria-label="{label}: {value}">
   </g>
 </svg>
 """
+
+
+def render_terminal_badge(score: SecurityScore, *, label: str = "security") -> Text:
+    """A shields.io-style pill badge for the terminal — same colors as
+
+    :func:`render_badge`'s SVG, rendered with Rich truecolor backgrounds
+    instead of `<rect>` elements. Plain color blocks rather than rounded
+    Nerd Font/Powerline glyphs on purpose: those need a patched font the
+    user's terminal may not have, and would show as broken boxes instead.
+    """
+    badge = Text()
+    badge.append(f" {label} ", style="bold white on #2b2f3a")
+    badge.append(f" {score.grade} ", style=f"bold #14171a on {score.color}")
+    return badge

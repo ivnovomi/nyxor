@@ -28,6 +28,7 @@ from nyxor.core.scripting.ast_nodes import (
     BreakStmt,
     Call,
     ContinueStmt,
+    DictLiteral,
     DocStmt,
     Expr,
     ExprStmt,
@@ -37,6 +38,7 @@ from nyxor.core.scripting.ast_nodes import (
     IfStmt,
     ImportStmt,
     Index,
+    IndexSetStmt,
     ListLiteral,
     Literal,
     PipStmt,
@@ -49,6 +51,7 @@ from nyxor.core.scripting.ast_nodes import (
     SetStmt,
     SleepStmt,
     Stmt,
+    TryStmt,
     UnaryOp,
     VarRef,
     WhileStmt,
@@ -176,6 +179,10 @@ def _check_expr(
         case ListLiteral(items=items):
             for item in items:
                 _check_expr(item, defined, functions, issues)
+        case DictLiteral(pairs=pairs):
+            for key, value in pairs:
+                _check_expr(key, defined, functions, issues)
+                _check_expr(value, defined, functions, issues)
         case Index(target=target, index=index_expr):
             _check_expr(target, defined, functions, issues)
             _check_expr(index_expr, defined, functions, issues)
@@ -190,6 +197,29 @@ def _check_expr(
                 _check_expr(inner, defined, functions, issues)
         case Literal():
             pass
+
+
+def _always_exits(statements: list[Stmt]) -> bool:
+    """True if this block can never fall off its end normally — every path
+
+    through it hits ``return``/``fail``/``break``/``continue``. Used to
+    decide whether a ``try``'s ``except`` body "always exits": if it does,
+    reaching the statement after the whole ``try``/``except`` means the
+    ``try`` body ran to completion, so its variables are safe to consider
+    defined there (unlike the general case, where they're only guaranteed
+    if both branches define them).
+    """
+    if not statements:
+        return False
+    match statements[-1]:
+        case ReturnStmt() | FailStmt() | BreakStmt() | ContinueStmt():
+            return True
+        case IfStmt(then_body=then_body, else_body=else_body):
+            return bool(else_body) and _always_exits(then_body) and _always_exits(else_body)
+        case TryStmt(body=body, except_body=except_body):
+            return _always_exits(body) and _always_exits(except_body)
+        case _:
+            return False
 
 
 def _check_module(module: str, line: int, issues: list[LintIssue]) -> None:
@@ -216,6 +246,10 @@ def _walk(
             case SetStmt(name=name, value=value):
                 _check_expr(value, defined, functions, issues)
                 defined.add(name)
+            case IndexSetStmt(target=target, index=index_expr, value=value):
+                _check_expr(target, defined, functions, issues)
+                _check_expr(index_expr, defined, functions, issues)
+                _check_expr(value, defined, functions, issues)
             case ExprStmt(value=value):
                 _check_expr(value, defined, functions, issues)
             case PrintStmt(value=value) | SleepStmt(value=value):
@@ -307,6 +341,26 @@ def _walk(
             case ImportStmt(path=path, alias=alias):
                 _check_expr(path, defined, functions, issues)
                 defined.add(alias)
+            case TryStmt(body=body, error_var=error_var, except_body=except_body, line=line):
+                if not body:
+                    issues.append(LintIssue("warning", line, "empty 'try' body"))
+                body_defined = _walk(
+                    body, defined, functions, issues, in_loop=in_loop, in_function=in_function
+                )
+                except_defined = _walk(
+                    except_body,
+                    defined | {error_var},
+                    functions,
+                    issues,
+                    in_loop=in_loop,
+                    in_function=in_function,
+                )
+                if _always_exits(except_body):
+                    defined |= body_defined
+                else:
+                    defined |= body_defined & except_defined
+                if _PERMISSIVE in body_defined or _PERMISSIVE in except_defined:
+                    defined.add(_PERMISSIVE)
             case PythonStmt(line=line):
                 issues.append(
                     LintIssue(

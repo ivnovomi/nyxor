@@ -36,6 +36,8 @@ KEYWORDS = frozenset(
         "func",
         "return",
         "import",
+        "try",
+        "except",
         "true",
         "false",
         "and",
@@ -45,7 +47,7 @@ KEYWORDS = frozenset(
 )
 
 _TWO_CHAR_OPS = {"==": "==", "!=": "!=", "<=": "<=", ">=": ">="}
-_ONE_CHAR_OPS = set("=<>+-*/:()[],.")
+_ONE_CHAR_OPS = set("=<>+-*/:()[]{},.")
 _ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'"}
 
 

@@ -1,4 +1,4 @@
-"""The ``script`` plugin: ``nyx script run|lint|new`` — NyxScript automation."""
+"""The ``script`` plugin: ``nyx script run|lint|new|repl`` — NyxScript automation."""
 
 from __future__ import annotations
 
@@ -11,7 +11,15 @@ from rich.table import Table
 from nyxor.core.context import NyxorContext
 from nyxor.core.errors import NyxorError
 from nyxor.core.interfaces import PluginMetadata
-from nyxor.core.scripting import TEMPLATE, LintIssue, lint_source, run_script
+from nyxor.core.scripting import (
+    TEMPLATE,
+    Interpreter,
+    LintIssue,
+    ScriptError,
+    lint_source,
+    parse,
+    run_script,
+)
 
 script_app = typer.Typer(
     name="script", help="Write, lint, and run NyxScript automation files.", no_args_is_help=True
@@ -85,8 +93,11 @@ def run(
         )
 
     def emit(line: str) -> None:
+        # markup=False: this is raw script output (e.g. `print [1, 2, 3]`),
+        # not our own Rich markup — Rich would otherwise try to parse a
+        # literal "[...]" in it as a style tag and silently eat the text.
         style = "#7ee7e1" if line.startswith("→") else "dim" if line.startswith("  ") else ""
-        console.print(line, style=style or None)
+        console.print(line, style=style or None, markup=False)
 
     asyncio.run(run_script(source, context.config, output=emit, base_dir=Path.cwd(), unsafe=unsafe))
     console.print("[bold green]Script finished.[/bold green]")
@@ -107,6 +118,74 @@ def new(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(TEMPLATE, encoding="utf-8")
     context.console.print(f"[green]Wrote starter script to[/green] {path}")
+
+
+_BLOCK_OPENERS = ("if", "foreach", "while", "func", "try")
+
+
+@script_app.command("repl")
+def repl(
+    ctx: typer.Context,
+    unsafe: bool = typer.Option(
+        False, "--unsafe", help="Allow 'python:' blocks and 'pip' statements to actually run."
+    ),
+) -> None:
+    """An interactive NyxScript prompt — variables and functions persist between lines."""
+    context: NyxorContext = ctx.obj
+    console = context.console
+    console.print(
+        "[dim]NyxScript REPL — variables persist across lines. "
+        "'exit' or Ctrl+D/Ctrl+C to quit.[/dim]"
+    )
+
+    def emit(line: str) -> None:
+        # markup=False: this is raw script output (e.g. `print [1, 2, 3]`),
+        # not our own Rich markup — Rich would otherwise try to parse a
+        # literal "[...]" in it as a style tag and silently eat the text.
+        style = "#7ee7e1" if line.startswith("→") else "dim" if line.startswith("  ") else ""
+        console.print(line, style=style or None, markup=False)
+
+    interpreter = Interpreter(context.config, output=emit, base_dir=Path.cwd(), unsafe=unsafe)
+    buffer: list[str] = []
+    depth = 0
+
+    while True:
+        try:
+            line = input("... " if depth > 0 else "nyx> ")
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            break
+
+        stripped = line.strip()
+        if not buffer and stripped in ("exit", "quit"):
+            break
+        if not buffer and not stripped:
+            continue
+
+        first_word = stripped.split(" ", 1)[0].rstrip(":") if stripped else ""
+        if first_word in _BLOCK_OPENERS and stripped.endswith(":"):
+            depth += 1
+        elif stripped == "end":
+            depth -= 1
+
+        buffer.append(line)
+        if depth > 0:
+            continue
+
+        source = "\n".join(buffer)
+        buffer = []
+        depth = 0
+
+        try:
+            program = parse(source)
+        except ScriptError as exc:
+            console.print(f"[bold red]{exc}[/bold red]")
+            continue
+
+        try:
+            asyncio.run(interpreter.run(program))
+        except ScriptError as exc:
+            console.print(f"[bold red]{exc}[/bold red]")
 
 
 @script_app.command("lsp")
@@ -136,7 +215,7 @@ class ScriptPlugin:
         description="A tiny, safe scripting language (NyxScript) for batch-driving modules.",
         version="0.1.0",
         author="NYXOR",
-        commands=("run", "lint", "new", "lsp"),
+        commands=("run", "lint", "new", "repl", "lsp"),
     )
 
     def register(self, app: typer.Typer, context: NyxorContext) -> None:

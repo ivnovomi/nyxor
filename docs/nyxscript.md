@@ -8,11 +8,13 @@ statement, every expression form, functions, imports/libraries, the
 interactive `ui.*` module, and the two escape hatches.
 
 Run `nyx script new myfile.nyx` to get a starter file, `nyx script lint
-myfile.nyx` to check one without running it, and `nyx script run
-myfile.nyx` to execute it. Every editor with an LSP client (VS Code,
-Neovim, Helix, ...) gets diagnostics/completion/hover for free from `nyx
-script lsp` — see [plugin-development.md](plugin-development.md) if
-you're embedding NyxScript somewhere new.
+myfile.nyx` to check one without running it, `nyx script run myfile.nyx`
+to execute it, and `nyx script repl` for an interactive prompt where
+variables and functions persist between lines. Every editor with an LSP
+client (VS Code, Neovim, Helix, ...) gets diagnostics/completion/hover for
+free from `nyx script lsp` — see
+[plugin-development.md](plugin-development.md) if you're embedding
+NyxScript somewhere new.
 
 ## Contents
 
@@ -20,15 +22,19 @@ you're embedding NyxScript somewhere new.
 - [Types and literals](#types-and-literals)
 - [Variables](#variables)
 - [Expressions and operators](#expressions-and-operators)
+- [Dicts](#dicts)
 - [String interpolation](#string-interpolation)
 - [Control flow](#control-flow)
+- [Error handling — `try`/`except`](#error-handling--tryexcept)
 - [Running scan modules](#running-scan-modules-run)
 - [Saving reports](#saving-reports-save)
 - [Functions](#functions)
 - [Libraries — `import`](#libraries--import)
+- [The standard library — `lib/`](#the-standard-library--lib)
 - [Built-in functions](#built-in-functions)
 - [Interactive UI — `ui.*`](#interactive-ui--ui)
 - [Diagnostics — `print` / `assert` / `fail` / `sleep`](#diagnostics)
+- [The REPL](#the-repl)
 - [Escape hatches: `python:` and `pip`](#escape-hatches-python-and-pip)
 - [The linter](#the-linter)
 - [Errors](#errors)
@@ -56,7 +62,8 @@ end
 | string | `"double"` or `'single'` quotes | supports `\n \t \\ \" \'` escapes and `{expr}` interpolation |
 | number | `42`, `3.14` | `int` if no `.`, otherwise `float` |
 | boolean | `true`, `false` | |
-| list | `[1, 2, 3]`, `["a", "b"]` | heterogeneous, indexable, no dict/map type |
+| list | `[1, 2, 3]`, `["a", "b"]` | heterogeneous, indexable |
+| dict | `{"a": 1, "b": 2}`, `{}` | string/number/bool keys, indexable — see [Dicts](#dicts) |
 
 There is no `null`/`none` literal — an undefined variable is a lint/runtime
 error, not a value.
@@ -124,7 +131,31 @@ design everywhere else.
 
 `+` on two strings concatenates; `+`/`-`/`*`/`/` on mismatched types raise
 a runtime error naming both types involved (`cannot apply '+' to string
-and int`) rather than silently coercing.
+and int`) rather than silently coercing. There's no `%` operator — use
+`mod(a, b)` from [`lib/math.nyx`](#the-standard-library--lib).
+
+## Dicts
+
+```
+set d = {"host": "example.com", "port": 443}
+print d["host"]                # example.com
+set d["port"] = 8443           # mutates in place
+```
+
+`set CONTAINER[index]... = expr` mutates a list or dict in place —
+the only form of mutation-through-indexing NyxScript has (there's still
+no way to *write* through `.field`; see below). It chains, so
+`set d["a"]["b"] = 1` works on a dict of dicts.
+
+Keys are usually strings but can be any hashable value (number, bool);
+building a dict with an unhashable key (a list or another dict) is a
+runtime error. Reading a missing key with `d["missing"]` is a runtime
+error too — use `get(d, "missing", default)` to avoid one. See
+[Built-in functions](#built-in-functions) for `keys`/`values`/`items`/`get`.
+
+Index assignment is unrelated to `.field` access above — it mutates a
+plain list/dict *value* the script itself created, not a scan result
+(those stay read-only).
 
 ## String interpolation
 
@@ -164,6 +195,30 @@ runtime error naming the function).
 
 `while` has a 1,000,000-iteration safety cap: a runaway `while true:`
 raises a clear runtime error instead of hanging a CI job forever.
+
+## Error handling — `try`/`except`
+
+```
+try:
+    set port = int(ui.input("Port:"))
+except err:
+    print "not a number: {err}"
+    set port = 443
+end
+```
+
+`try` runs its body; if a statement inside raises a NyxScript runtime
+error (a bad type conversion, a missing dict key, a failed `run`, an
+`assert`/`fail`, ...), execution jumps straight to `except VAR:` with
+`VAR` bound to the error's message (a string) for the duration of that
+block only. If the body succeeds, `except` never runs. `break`/`continue`/
+`return` inside the body still propagate normally — `try` only catches
+NyxScript's own `RuntimeScriptError`, not control flow.
+
+A variable `try`'s body sets is only guaranteed defined afterward if the
+`except` branch can't fall through past it (i.e. it always
+`return`s/`fail`s/`break`s/`continue`s) — the linter checks this the same
+way it checks `if`/`else` branches.
 
 ## Running scan modules: `run`
 
@@ -293,6 +348,35 @@ doesn't false-positive on the module reference itself, but it does not
 follow the import cross-file — a genuinely missing member is caught by
 the interpreter at run time, not by `nyx script lint`.
 
+## The standard library — `lib/`
+
+NYXOR ships a small standard library, written entirely in NyxScript
+itself, at [`lib/`](../lib) in the repo root — import it the same way as
+any other `.nyx` file:
+
+```
+import "lib/math.nyx" as math
+import "lib/dict.nyx" as dict
+import "lib/validate.nyx" as validate
+import "lib/collection.nyx" as collection
+import "lib/strings.nyx" as strings
+import "lib/finding.nyx" as findings
+import "lib/report.nyx" as report
+
+print math.clamp(150, 0, 100)                    # 100
+print validate.is_valid_domain("example.com")    # true
+```
+
+| File | Functions |
+|---|---|
+| `math.nyx` | `mod(a, b)`, `clamp(x, lo, hi)`, `mean(list)`, `median(list)`, `gcd(a, b)`, `is_prime(n)` |
+| `dict.nyx` | `merge(a, b)`, `pick(d, keys)`, `invert(d)`, `from_pairs(pairs)` |
+| `validate.nyx` | `is_valid_port(v)`, `is_valid_ipv4(s)`, `is_valid_domain(s)` — conservative sanity checks, not full RFC parsers |
+| `collection.nyx` | `unique(list)`, `chunk(list, size)` |
+| `strings.nyx` | `title_case(s)`, `truncate(s, max_len)` |
+| `finding.nyx` | `count_by_severity(results, sev)`, `total_findings(results)`, `worst_severity(results)`, `summary_line(results, target)` |
+| `report.nyx` | `severity_breakdown(results)` (a dict of `severity -> count`), `print_summary(results, target)` (prints the summary line plus a `ui.table` breakdown) |
+
 ## Built-in functions
 
 Pure, synchronous, no I/O — safe to call anywhere, no `--unsafe` needed.
@@ -310,7 +394,10 @@ Pure, synchronous, no I/O — safe to call anywhere, no `--unsafe` needed.
 | `abs` / `round` | `abs(x)` / `round(x[, digits])` | |
 | `sorted` / `reversed` | `sorted(list)` / `reversed(list)` | new list |
 | `min` / `max` / `sum` | `min(list)` or `min(a, b, ...)`; `sum(list)` | |
-| `type_of` | `type_of(x)` | `"string"`, `"int"`, `"float"`, `"bool"`, `"list"` |
+| `type_of` | `type_of(x)` | `"string"`, `"int"`, `"float"`, `"bool"`, `"list"`, `"dict"` |
+| `keys` / `values` | `keys(d)` / `values(d)` | → list, in insertion order |
+| `items` | `items(d)` | → list of `[key, value]` pairs |
+| `get` | `get(d, key, default)` | dict lookup with a mandatory default (no `null` to fall back to otherwise) |
 
 ## Interactive UI — `ui.*`
 
@@ -357,6 +444,29 @@ fail "message"              # abort the script unconditionally
 sleep SECONDS               # pause (float seconds)
 ```
 
+## The REPL
+
+```
+$ nyx script repl
+NyxScript REPL — variables persist across lines. 'exit' or Ctrl+D/Ctrl+C to quit.
+nyx> set d = {}
+nyx> set d["found"] = 0
+nyx> func bump():
+...     set d["found"] = d["found"] + 1
+... end
+nyx> bump()
+nyx> print d
+{found: 1}
+nyx> exit
+```
+
+`nyx script repl` (optionally with `--unsafe`) evaluates each line — or
+each complete `if`/`foreach`/`while`/`func`/`try`/`python:` block, once
+its matching `end` arrives — against one long-lived `Interpreter`, so
+everything `set` or `func`-defined earlier is still there on the next
+line. It's a scratchpad for trying out a snippet before it goes in a real
+`.nyx` file, not a replacement for `nyx script run`.
+
 ## Escape hatches: `python:` and `pip`
 
 Both are **disabled by default** and refuse to run without `--unsafe`
@@ -399,7 +509,9 @@ network access. It catches:
   mean" suggestion via `difflib`
 - unknown `ui.*` members
 - `break`/`continue` outside a loop, `return` outside a function
-- empty `if`/`foreach`/`while`/`func` bodies (warning)
+- empty `if`/`foreach`/`while`/`func`/`try` bodies (warning)
+- a variable used after `try`/`except` that isn't guaranteed defined on
+  every path that reaches it (see [Error handling](#error-handling--tryexcept))
 - `python:`/`pip` usage (warning — valid, but requires `--unsafe`)
 
 It does **not** catch: function-call arity mismatches (that's a runtime
@@ -419,13 +531,14 @@ executes.
 ```
 program        := statement*
 
-statement      := set_stmt | if_stmt | foreach_stmt | while_stmt
-                | break_stmt | continue_stmt | func_stmt | return_stmt
-                | import_stmt | run_stmt | save_stmt | print_stmt
-                | sleep_stmt | assert_stmt | fail_stmt | pip_stmt
-                | python_block | expr_stmt | doc_stmt
+statement      := set_stmt | index_set_stmt | if_stmt | foreach_stmt
+                | while_stmt | break_stmt | continue_stmt | func_stmt
+                | return_stmt | import_stmt | try_stmt | run_stmt
+                | save_stmt | print_stmt | sleep_stmt | assert_stmt
+                | fail_stmt | pip_stmt | python_block | expr_stmt | doc_stmt
 
 set_stmt       := "set" IDENT "=" expr
+index_set_stmt := "set" IDENT index_suffix+ "=" expr
 if_stmt        := "if" expr ":" statement* ("else" ":" statement*)? "end"
 foreach_stmt   := "foreach" IDENT "in" expr ":" statement* "end"
 while_stmt     := "while" expr ":" statement* "end"
@@ -434,6 +547,7 @@ continue_stmt  := "continue"
 func_stmt      := "func" IDENT "(" (IDENT ("," IDENT)*)? ")" ":" statement* "end"
 return_stmt    := "return" expr?
 import_stmt    := "import" expr "as" IDENT
+try_stmt       := "try" ":" statement* "except" IDENT ":" statement* "end"
 run_stmt       := "run" IDENT expr ("as" IDENT)?
 save_stmt      := "save" IDENT "to" expr
 print_stmt     := "print" expr
@@ -459,6 +573,7 @@ index_suffix   := "[" expr "]"
 attr_suffix    := "." IDENT
 primary        := NUMBER | STRING | "true" | "false"
                 | "[" (expr ("," expr)*)? "]"
+                | "{" (expr ":" expr ("," expr ":" expr)*)? "}"
                 | "(" expr ")"
                 | IDENT                            # a variable, or a call/index base
 ```

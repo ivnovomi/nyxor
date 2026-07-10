@@ -1,6 +1,25 @@
 import "lib/finding.nyx" as findings
 
 
+func severity_breakdown(results):
+    "A dict of severity -> count, e.g. {\"critical\": 0, \"high\": 2, ...}."
+    set order = ["critical", "high", "medium", "low", "info"]
+    set out = {}
+
+    foreach level in order:
+        set out[level] = findings.count_by_severity(results, level)
+    end
+    return out
+end
+
 func print_summary(results, target):
-    set total = findings.count_by_severity(results, target)
+    "Prints a one-line summary plus a per-severity breakdown table."
+    print findings.summary_line(results, target)
+
+    set breakdown = severity_breakdown(results)
+    set rows = []
+    foreach level in keys(breakdown):
+        set rows = rows + [[level, str(get(breakdown, level, 0))]]
+    end
+    ui.table(["severity", "count"], rows)
 end

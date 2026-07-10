@@ -35,6 +35,7 @@ from nyxor.core.scripting.ast_nodes import (
     BreakStmt,
     Call,
     ContinueStmt,
+    DictLiteral,
     DocStmt,
     Expr,
     ExprStmt,
@@ -44,6 +45,7 @@ from nyxor.core.scripting.ast_nodes import (
     IfStmt,
     ImportStmt,
     Index,
+    IndexSetStmt,
     ListLiteral,
     Literal,
     PipStmt,
@@ -56,6 +58,7 @@ from nyxor.core.scripting.ast_nodes import (
     SetStmt,
     SleepStmt,
     Stmt,
+    TryStmt,
     UnaryOp,
     VarRef,
     WhileStmt,
@@ -100,6 +103,9 @@ def _format_value(value: Any) -> str:
         return "true" if value else "false"
     if isinstance(value, list):
         return "[" + ", ".join(_format_value(v) for v in value) + "]"
+    if isinstance(value, dict):
+        pairs = ", ".join(f"{_format_value(k)}: {_format_value(v)}" for k, v in value.items())
+        return "{" + pairs + "}"
     return str(value)
 
 
@@ -240,6 +246,18 @@ class Interpreter:
                 return value
             case ListLiteral(items=items):
                 return [await self.eval_expr(item) for item in items]
+            case DictLiteral(pairs=pairs, line=line):
+                result: dict[Any, Any] = {}
+                for key_expr, value_expr in pairs:
+                    key = await self.eval_expr(key_expr)
+                    value = await self.eval_expr(value_expr)
+                    try:
+                        result[key] = value
+                    except TypeError as exc:
+                        raise RuntimeScriptError(
+                            f"cannot use a {type(key).__name__} as a dict key", line=line
+                        ) from exc
+                return result
             case VarRef(name=name, line=line):
                 return self._get_var(name, line)
             case Index(target=target, index=index_expr, line=line):
@@ -416,6 +434,23 @@ class Interpreter:
         match statement:
             case SetStmt(name=name, value=value):
                 self._set_var(name, await self.eval_expr(value))
+            case IndexSetStmt(target=target, index=index_expr, value=value_expr, line=line):
+                container = await self.eval_expr(target)
+                idx = await self.eval_expr(index_expr)
+                new_value = await self.eval_expr(value_expr)
+                if not isinstance(container, list | dict):
+                    raise RuntimeScriptError(
+                        f"cannot assign into a {type(container).__name__}", line=line
+                    )
+                try:
+                    container[idx] = new_value
+                except TypeError as exc:
+                    raise RuntimeScriptError(
+                        f"cannot index a {type(container).__name__} with a {type(idx).__name__}",
+                        line=line,
+                    ) from exc
+                except IndexError as exc:
+                    raise RuntimeScriptError(f"index {idx!r} out of range", line=line) from exc
             case ExprStmt(value=value):
                 await self.eval_expr(value)
             case PrintStmt(value=value):
@@ -494,6 +529,12 @@ class Interpreter:
                 raise _ReturnSignal(await self.eval_expr(value) if value is not None else None)
             case ImportStmt(path=path, alias=alias, line=line):
                 await self._exec_import(path, alias, line)
+            case TryStmt(body=body, error_var=error_var, except_body=except_body):
+                try:
+                    await self.exec_block(body)
+                except RuntimeScriptError as exc:
+                    self._set_var(error_var, exc.reason)
+                    await self.exec_block(except_body)
             case PythonStmt(code=code, line=line):
                 await self._exec_python(code, line)
             case PipStmt(package=package, line=line):

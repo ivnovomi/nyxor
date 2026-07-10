@@ -15,6 +15,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from rich.markup import escape as escape_markup
 from rich.text import Text
 from textual import work
 from textual.app import App, ComposeResult
@@ -591,7 +592,11 @@ class NyxorApp(App[None]):
         status.update("[#7ee7e1]Running…[/]")
 
         def emit(line: str) -> None:
-            log.write(line)
+            # This is raw script output (e.g. `print [1, 2, 3]`), not our own
+            # Rich markup — escape it so the log widget (markup=True, for our
+            # own "[bold]...[/]" status lines) renders a literal "[1, 2, 3]"
+            # instead of trying to parse it as a style tag and eating it.
+            log.write(escape_markup(line))
 
         # ui.confirm/input/select need the real terminal, which Textual is
         # currently holding onto — ScriptUI(app=self) wraps each of those in

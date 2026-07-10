@@ -50,6 +50,8 @@ _CONTROL_KEYWORDS = {
     "while",
     "break",
     "continue",
+    "try",
+    "except",
     "in",
     "as",
     "to",
@@ -242,7 +244,10 @@ class NyxScriptEditor(TextArea):
         stripped = line.strip()
         unit = self._indent_unit()
 
-        if stripped in _DEDENT_LINES and len(indent) >= len(unit):
+        is_dedent_line = stripped in _DEDENT_LINES or (
+            stripped.startswith("except ") and stripped.endswith(":")
+        )
+        if is_dedent_line and len(indent) >= len(unit):
             target_indent = indent[: -len(unit)]
             if target_indent != indent:
                 new_line = target_indent + line[indent_len:]

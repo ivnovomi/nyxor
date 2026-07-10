@@ -2,6 +2,53 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.4.0 — NyxScript grows up: dicts, error handling, a REPL, and a stdlib
+
+### NyxScript language
+- **Dicts**: `{"key": value, ...}` literals, indexing (`d["key"]`), and
+  `set CONTAINER[index]... = expr` for in-place mutation of a list or
+  dict (chainable — `set d["a"]["b"] = 1` works). New builtins:
+  `keys`, `values`, `items`, `get` (with a mandatory default — NyxScript
+  still has no `null` to silently fall back to).
+- **Error handling**: `try: ... except err: ... end` catches a NyxScript
+  runtime error and binds its message to `err` for the `except` block.
+  Never catches `break`/`continue`/`return`. The linter understands it:
+  a variable the `try` body sets is treated as defined afterward only
+  when the `except` branch can't fall through past it.
+- **Standard library, written entirely in NyxScript** (`lib/`): `math.nyx`
+  (`mod`, `clamp`, `mean`, `median`, `gcd`, `is_prime` — NyxScript has no
+  `%` operator, `mod()` is the way), `dict.nyx` (`merge`, `pick`,
+  `invert`, `from_pairs`), `validate.nyx` (`is_valid_port`,
+  `is_valid_ipv4`, `is_valid_domain`), plus the existing
+  `collection`/`strings`/`finding` libs and a fixed, working
+  `report.nyx` (it shipped with an empty function body).
+- **`nyx script repl`**: an interactive prompt where variables and
+  functions persist across lines — multi-line blocks (`if`/`foreach`/
+  `while`/`func`/`try`/`python:`) are detected and only run once their
+  matching `end` arrives.
+- VS Code extension, TUI editor, and the Claude Skill all updated for
+  the new grammar (`{`/`}`, `try`/`except`, the new builtins).
+
+### Fixes found while building the above
+- **Rich was eating printed lists/dicts.** `print [1, 2, 3]` rendered as
+  `[, , ]` in both `nyx script run`/`repl` and the TUI's script log,
+  because Rich's markup parser treats a literal `[...]` in output as a
+  style tag. Fixed with `markup=False` (CLI/REPL) and `rich.markup.escape`
+  (TUI) on script-generated output specifically — our own `[bold]...[/]`
+  status lines are untouched.
+- A linter false-negative/positive pair around `try`/`except` definite-
+  assignment (see above).
+
+### Terminal badges and `--dumber`
+- `nyx audit` and `nyx watch` now print a shields.io-style pill badge
+  directly in the terminal (`render_terminal_badge` in `core/scoring.py`)
+  using Rich truecolor backgrounds — plain color blocks, not Nerd Font
+  glyphs, so it doesn't break on terminals without a patched font.
+- `nyx audit --dumber`: a plain-language, no-jargon explanation of every
+  finding (`core/explain.py`) — purely templated, no LLM call, no extra
+  network access. Falls back to a generic severity-flavored line for
+  anything it doesn't have a specific explainer for.
+
 ## 0.3.6 — Hotfix: audit crashing on redirects
 
 - `nyx audit` crashed on any target that redirects (e.g. bare domain ->

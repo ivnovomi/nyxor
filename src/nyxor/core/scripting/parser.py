@@ -17,6 +17,7 @@ from nyxor.core.scripting.ast_nodes import (
     BreakStmt,
     Call,
     ContinueStmt,
+    DictLiteral,
     DocStmt,
     Expr,
     ExprStmt,
@@ -26,6 +27,7 @@ from nyxor.core.scripting.ast_nodes import (
     IfStmt,
     ImportStmt,
     Index,
+    IndexSetStmt,
     ListLiteral,
     Literal,
     PipStmt,
@@ -38,6 +40,7 @@ from nyxor.core.scripting.ast_nodes import (
     SetStmt,
     SleepStmt,
     Stmt,
+    TryStmt,
     UnaryOp,
     VarRef,
     WhileStmt,
@@ -174,6 +177,7 @@ class Parser:
         "func",
         "return",
         "import",
+        "try",
     )
 
     def _parse_statement(self) -> Stmt:
@@ -201,13 +205,22 @@ class Parser:
             self._pos = checkpoint
         raise ParseError(f"expected a statement, got {token.value!r}", line=token.line)
 
-    def _parse_set(self) -> SetStmt:
+    def _parse_set(self) -> SetStmt | IndexSetStmt:
         line = self._advance().line
         name = self._expect_type("IDENT", "a variable name").value
+        target: Expr = VarRef(name, line)
+        while self._peek().type == "[":
+            index_line = self._advance().line
+            index_expr = self.parse_expr()
+            self._expect_op("]")
+            target = Index(target=target, index=index_expr, line=index_line)
         self._expect_op("=")
         value = self.parse_expr()
         self._end_statement()
-        return SetStmt(name=name, value=value, line=line)
+        if isinstance(target, VarRef):
+            return SetStmt(name=target.name, value=value, line=line)
+        assert isinstance(target, Index)
+        return IndexSetStmt(target=target.target, index=target.index, value=value, line=line)
 
     def _parse_if(self) -> IfStmt:
         line = self._advance().line
@@ -284,6 +297,20 @@ class Parser:
             value = self.parse_expr()
         self._end_statement()
         return ReturnStmt(value=value, line=line)
+
+    def _parse_try(self) -> TryStmt:
+        line = self._advance().line
+        self._expect_op(":")
+        self._end_statement()
+        body = self._parse_block({"except"})
+        self._expect_ident("except")
+        error_var = self._expect_type("IDENT", "an error variable name").value
+        self._expect_op(":")
+        self._end_statement()
+        except_body = self._parse_block({"end"})
+        self._expect_ident("end")
+        self._end_statement()
+        return TryStmt(body=body, error_var=error_var, except_body=except_body, line=line)
 
     def _parse_import(self) -> ImportStmt:
         line = self._advance().line
@@ -467,6 +494,17 @@ class Parser:
             self._expect_op("]")
             return ListLiteral(items, token.line)
 
+        if token.type == "{":
+            self._advance()
+            pairs: list[tuple[Expr, Expr]] = []
+            if self._peek().type != "}":
+                pairs.append(self._parse_dict_pair())
+                while self._peek().type == ",":
+                    self._advance()
+                    pairs.append(self._parse_dict_pair())
+            self._expect_op("}")
+            return DictLiteral(pairs, token.line)
+
         if token.type == "(":
             self._advance()
             expr = self.parse_expr()
@@ -478,6 +516,12 @@ class Parser:
             return VarRef(token.value, token.line)
 
         raise ParseError(f"unexpected token {token.value!r}", line=token.line)
+
+    def _parse_dict_pair(self) -> tuple[Expr, Expr]:
+        key = self.parse_expr()
+        self._expect_op(":")
+        value = self.parse_expr()
+        return key, value
 
 
 def parse(source: str) -> Program:

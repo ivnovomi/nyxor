@@ -15,7 +15,8 @@
     { "include": "#modules" },
     { "include": "#builtin-functions" },
     { "include": "#function-call" },
-    { "include": "#operators" }
+    { "include": "#operators" },
+    { "include": "#braces" }
   ],
   "repository": {
     "python-block": {
@@ -94,7 +95,7 @@
       "name": "constant.language.boolean.nyxscript"
     },
     "keywords": {
-      "match": "\\b(set|if|else|end|foreach|while|break|continue|func|return|import|in|run|as|to|save|print|sleep|assert|fail|pip|and|or|not)\\b",
+      "match": "\\b(set|if|else|end|foreach|while|break|continue|func|return|import|try|except|in|run|as|to|save|print|sleep|assert|fail|pip|and|or|not)\\b",
       "name": "keyword.control.nyxscript"
     },
     "function-def": {
@@ -105,7 +106,7 @@
       }
     },
     "modules": {
-      "match": "\\b(audit|dns|tls|http|network\\.discover|network\\.scan)\\b",
+      "match": "\\b(audit|dns|tls|http|network\\.discover|network\\.scan|recon)\\b",
       "name": "support.function.nyxscript"
     },
     "ui-functions": {
@@ -113,7 +114,7 @@
       "name": "support.function.builtin.nyxscript"
     },
     "builtin-functions": {
-      "match": "\\b(len|range|upper|lower|strip|split|join|contains|str|int|float|abs|round|sorted|reversed|min|max|sum|type_of)\\b(?=\\s*\\()",
+      "match": "\\b(len|range|upper|lower|strip|split|join|contains|str|int|float|abs|round|sorted|reversed|min|max|sum|type_of|keys|values|items|get)\\b(?=\\s*\\()",
       "name": "support.function.builtin.nyxscript"
     },
     "function-call": {
@@ -123,6 +124,10 @@
     "operators": {
       "match": "(==|!=|<=|>=|<|>|=|\\+|-|\\*|/)",
       "name": "keyword.operator.nyxscript"
+    },
+    "braces": {
+      "match": "[{}]",
+      "name": "punctuation.definition.dict.nyxscript"
     }
   }
 }

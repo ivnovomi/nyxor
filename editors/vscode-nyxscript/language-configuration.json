@@ -3,23 +3,26 @@
     "lineComment": "#"
   },
   "brackets": [
+    ["{", "}"],
     ["[", "]"],
     ["(", ")"]
   ],
   "autoClosingPairs": [
+    { "open": "{", "close": "}" },
     { "open": "[", "close": "]" },
     { "open": "(", "close": ")" },
     { "open": "\"", "close": "\"" },
     { "open": "'", "close": "'" }
   ],
   "surroundingPairs": [
+    ["{", "}"],
     ["[", "]"],
     ["(", ")"],
     ["\"", "\""],
     ["'", "'"]
   ],
   "indentationRules": {
-    "increaseIndentPattern": "^\\s*(if|foreach|while|func|python)\\b.*:\\s*$",
-    "decreaseIndentPattern": "^\\s*(end|else)\\b"
+    "increaseIndentPattern": "^\\s*(if|foreach|while|func|try|python)\\b.*:\\s*$",
+    "decreaseIndentPattern": "^\\s*(end|else|except)\\b"
   }
 }

@@ -139,7 +139,44 @@ def _type_of(args: list[Any]) -> str:
         return "string"
     if isinstance(value, list):
         return "list"
+    if isinstance(value, dict):
+        return "dict"
     return type(value).__name__
+
+
+def _keys(args: list[Any]) -> list[Any]:
+    if len(args) != 1:
+        raise _arity_error("keys", "1 argument", len(args))
+    if not isinstance(args[0], dict):
+        raise TypeError(f"keys() expects a dict, got {type(args[0]).__name__}")
+    return list(args[0].keys())
+
+
+def _values(args: list[Any]) -> list[Any]:
+    if len(args) != 1:
+        raise _arity_error("values", "1 argument", len(args))
+    if not isinstance(args[0], dict):
+        raise TypeError(f"values() expects a dict, got {type(args[0]).__name__}")
+    return list(args[0].values())
+
+
+def _items(args: list[Any]) -> list[list[Any]]:
+    if len(args) != 1:
+        raise _arity_error("items", "1 argument", len(args))
+    if not isinstance(args[0], dict):
+        raise TypeError(f"items() expects a dict, got {type(args[0]).__name__}")
+    return [[k, v] for k, v in args[0].items()]
+
+
+def _get(args: list[Any]) -> Any:
+    # NyxScript has no null/none literal, so — unlike Python's dict.get —
+    # the default is mandatory: there's no value to hand back otherwise.
+    if len(args) != 3:
+        raise _arity_error("get", "3 arguments (dict, key, default)", len(args))
+    mapping, key, default = args
+    if not isinstance(mapping, dict):
+        raise TypeError(f"get() expects a dict, got {type(mapping).__name__}")
+    return mapping.get(key, default)
 
 
 BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
@@ -162,4 +199,8 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "max": _max,
     "sum": _sum,
     "type_of": _type_of,
+    "keys": _keys,
+    "values": _values,
+    "items": _items,
+    "get": _get,
 }

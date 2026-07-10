@@ -1,0 +1,51 @@
+# Cheap, conservative input validators for NyxScript automation scripts —
+# not full RFC parsers, just enough to catch obvious typos in a target
+# before spending a network round-trip on it.
+
+func is_valid_port(value):
+    "True if value parses as an integer in the valid TCP/UDP port range."
+    try:
+        set n = int(value)
+    except err:
+        return false
+    end
+    return n >= 1 and n <= 65535
+end
+
+func is_valid_ipv4(s):
+    "True if s looks like a dotted-quad IPv4 address."
+    set parts = split(s, ".")
+    if len(parts) != 4:
+        return false
+    end
+
+    foreach part in parts:
+        try:
+            set n = int(part)
+        except err:
+            return false
+        end
+        if n < 0 or n > 255:
+            return false
+        end
+    end
+    return true
+end
+
+func is_valid_domain(s):
+    "A conservative sanity check on a hostname — not a full RFC 1035 validator."
+    if len(s) == 0 or len(s) > 253:
+        return false
+    end
+    if not contains(s, "."):
+        return false
+    end
+
+    set labels = split(s, ".")
+    foreach label in labels:
+        if len(label) == 0 or len(label) > 63:
+            return false
+        end
+    end
+    return true
+end

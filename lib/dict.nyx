@@ -1,0 +1,47 @@
+# Dict helpers for NyxScript — built on the native dict type plus the
+# keys()/values()/items()/get() builtins.
+
+func merge(a, b):
+    "Returns a new dict with b's keys overriding a's."
+    set out = {}
+
+    foreach k in keys(a):
+        set out[k] = get(a, k, "")
+    end
+    foreach k in keys(b):
+        set out[k] = get(b, k, "")
+    end
+    return out
+end
+
+func pick(d, wanted_keys):
+    "Returns a new dict containing only the given keys, skipping missing ones."
+    set out = {}
+
+    foreach k in wanted_keys:
+        if contains(keys(d), k):
+            set out[k] = get(d, k, "")
+        end
+    end
+    return out
+end
+
+func invert(d):
+    "Swaps keys and values. On duplicate values, the last key wins."
+    set out = {}
+
+    foreach k in keys(d):
+        set out[get(d, k, "")] = k
+    end
+    return out
+end
+
+func from_pairs(pairs):
+    "Builds a dict from a list of [key, value] pairs — the inverse of items()."
+    set out = {}
+
+    foreach pair in pairs:
+        set out[pair[0]] = pair[1]
+    end
+    return out
+end

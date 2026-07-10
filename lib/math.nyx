@@ -1,0 +1,64 @@
+# Math lib for NyxScript.
+# NyxScript has no % operator — mod() emulates it via int() truncation.
+
+func mod(a, b):
+    "Integer remainder of a / b."
+    return a - int(a / b) * b
+end
+
+func clamp(x, lo, hi):
+    "Clamps x into the [lo, hi] range."
+    if x < lo:
+        return lo
+    end
+    if x > hi:
+        return hi
+    end
+    return x
+end
+
+func mean(numbers):
+    "Arithmetic mean of a non-empty list of numbers."
+    return sum(numbers) / len(numbers)
+end
+
+func median(numbers):
+    "Median of a non-empty list of numbers."
+    set ordered = sorted(numbers)
+    set n = len(ordered)
+    set mid = int(n / 2)
+
+    if mod(n, 2) == 1:
+        return ordered[mid]
+    end
+    return (ordered[mid - 1] + ordered[mid]) / 2
+end
+
+func gcd(a, b):
+    "Greatest common divisor, via the Euclidean algorithm."
+    set x = a
+    set y = b
+
+    while y != 0:
+        set remainder = mod(x, y)
+        set x = y
+        set y = remainder
+    end
+    return x
+end
+
+func is_prime(n):
+    "True if n is a prime number."
+    if n < 2:
+        return false
+    end
+
+    set i = 2
+    while i * i <= n:
+        if mod(n, i) == 0:
+            return false
+        end
+        set i = i + 1
+    end
+    return true
+end
