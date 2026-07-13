@@ -44,6 +44,7 @@ from nyxor.core.scripting.ast_nodes import (
     Stmt,
     TryStmt,
     UnaryOp,
+    UnsafeStmt,
     VarRef,
     WhileStmt,
 )
@@ -180,6 +181,7 @@ class Parser:
         "return",
         "import",
         "try",
+        "unsafe",
     )
 
     def _parse_statement(self) -> Stmt:
@@ -271,6 +273,11 @@ class Parser:
         line = self._advance().line
         self._end_statement()
         return ContinueStmt(line=line)
+
+    def _parse_unsafe(self) -> UnsafeStmt:
+        line = self._advance().line
+        self._end_statement()
+        return UnsafeStmt(line=line)
 
     def _parse_func(self) -> FuncDef:
         line = self._advance().line

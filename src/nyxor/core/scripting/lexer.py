@@ -33,6 +33,7 @@ KEYWORDS = frozenset(
         "fail",
         "pip",
         "pyblock",
+        "unsafe",
         "func",
         "return",
         "import",

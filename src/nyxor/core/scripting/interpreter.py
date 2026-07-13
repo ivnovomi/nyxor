@@ -62,6 +62,7 @@ from nyxor.core.scripting.ast_nodes import (
     Stmt,
     TryStmt,
     UnaryOp,
+    UnsafeStmt,
     VarRef,
     WhileStmt,
     function_docstring,
@@ -603,6 +604,8 @@ class Interpreter:
                 raise _BreakSignal
             case ContinueStmt():
                 raise _ContinueSignal
+            case UnsafeStmt():
+                self.unsafe = True
             case FuncDef(name=name, params=params, body=body):
                 self.env[name] = NyxFunction(
                     name=name,

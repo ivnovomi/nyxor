@@ -78,6 +78,7 @@ _ACTION_KEYWORDS = {
     "func",
     "lambda",
     "import",
+    "unsafe",
 }
 _BOOL_KEYWORDS = {"true", "false"}
 

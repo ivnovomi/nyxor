@@ -226,6 +226,16 @@ class ContinueStmt:
 
 
 @dataclass(frozen=True)
+class UnsafeStmt:
+    """`unsafe` — self-enables python:/pip for the rest of this script,
+
+    regardless of whether --unsafe was passed on the CLI.
+    """
+
+    line: int
+
+
+@dataclass(frozen=True)
 class FuncDef:
     name: str
     params: list[str]
@@ -319,6 +329,7 @@ Stmt = (
     | DocStmt
     | PythonStmt
     | PipStmt
+    | UnsafeStmt
 )
 
 

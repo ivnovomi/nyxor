@@ -57,6 +57,7 @@ _ACTION_DOCS = {
     "break": "`break` — exit the current loop.",
     "continue": "`continue` — skip to the next loop iteration.",
     "import": '`import "lib.nyx" as NAME` — load functions from another script.',
+    "unsafe": "`unsafe` — self-enables 'python:'/'pip' for the rest of this script.",
 }
 
 _BUILTIN_DOCS = {

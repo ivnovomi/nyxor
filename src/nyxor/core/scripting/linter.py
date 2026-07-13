@@ -55,6 +55,7 @@ from nyxor.core.scripting.ast_nodes import (
     Stmt,
     TryStmt,
     UnaryOp,
+    UnsafeStmt,
     VarRef,
     WhileStmt,
 )
@@ -396,6 +397,14 @@ def _walk(
                         "warning",
                         line,
                         "'pip' installs a package at run time; requires --unsafe to run",
+                    )
+                )
+            case UnsafeStmt(line=line):
+                issues.append(
+                    LintIssue(
+                        "warning",
+                        line,
+                        "'unsafe' self-enables python:/pip for this script, ignoring --unsafe",
                     )
                 )
             case DocStmt():
