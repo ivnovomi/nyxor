@@ -96,10 +96,30 @@ def _contains(args: list[Any]) -> bool:
     return args[1] in args[0]
 
 
+def format_value(value: Any) -> str:
+    """Renders any NyxScript value the way script output shows it — bools as
+
+    lowercase true/false (not Python's True/False), lists/dicts
+    recursively in NyxScript's own bracket syntax. Used by both `print`
+    (via the interpreter) and the `str()` builtin, which must agree: `str(x)`
+    where `x` came from `print x` would otherwise silently disagree with
+    what the script just saw on screen (`str(true)` giving `"True"` while
+    `print true` shows `true`).
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return "[" + ", ".join(format_value(v) for v in value) + "]"
+    if isinstance(value, dict):
+        pairs = ", ".join(f"{format_value(k)}: {format_value(v)}" for k, v in value.items())
+        return "{" + pairs + "}"
+    return str(value)
+
+
 def _str(args: list[Any]) -> str:
     if len(args) != 1:
         raise _arity_error("str", "1 argument", len(args))
-    return str(args[0])
+    return format_value(args[0])
 
 
 def _int(args: list[Any]) -> int:

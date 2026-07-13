@@ -66,7 +66,7 @@ from nyxor.core.scripting.ast_nodes import (
     WhileStmt,
     function_docstring,
 )
-from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS, HIGHER_ORDER_FUNCTIONS
+from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS, HIGHER_ORDER_FUNCTIONS, format_value
 from nyxor.core.scripting.errors import RuntimeScriptError, ScriptError
 from nyxor.core.scripting.parser import parse, parse_expression
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
@@ -121,15 +121,7 @@ def _truthy(value: Any) -> bool:
     return bool(value)
 
 
-def _format_value(value: Any) -> str:
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, list):
-        return "[" + ", ".join(_format_value(v) for v in value) + "]"
-    if isinstance(value, dict):
-        pairs = ", ".join(f"{_format_value(k)}: {_format_value(v)}" for k, v in value.items())
-        return "{" + pairs + "}"
-    return str(value)
+_format_value = format_value
 
 
 @dataclass(frozen=True)
