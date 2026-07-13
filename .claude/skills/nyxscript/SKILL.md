@@ -182,20 +182,58 @@ time.
 `lower`, `strip`, `split`, `join`, `contains`, `str`, `int`, `float`,
 `abs`, `round`, `sorted`, `reversed`, `min`, `max`, `sum`, `type_of`,
 `keys`, `values`, `items`, `get`, `replace`, `starts_with`, `ends_with`,
-`find`, `zip`, `parse_json`, `to_json`. No `%` operator — use `mod(a, b)`
-from `lib/math.nyx` (see below). `parse_json` errors on `null` (no way
-to represent it — same reason `get()`'s default is mandatory).
+`find`, `zip`, `parse_json`, `to_json`, `now`, `to_iso8601`, `sha256`,
+`md5`. No `%` operator — use `mod(a, b)` from `lib/math.nyx` (see
+below). No `**` operator — see `lib/time.nyx`'s `backoff_delay` for
+exponentiation via repeated doubling. `parse_json` errors on `null` (no
+way to represent it — same reason `get()`'s default is mandatory).
+`range()`/`*` (sequence repetition) are capped at 1,000,000 resulting
+items.
+
+**Regex builtins** — `regex_match(text, pattern)`,
+`regex_find(text, pattern, default)`, `regex_find_all(text, pattern)`,
+`regex_replace(text, pattern, replacement)`. Run in a sandboxed worker
+process with a 1-second timeout (catastrophic-backtracking patterns get
+killed, not left to hang). **Gotcha**: every string literal runs through
+`{expr}` interpolation, so a quantifier like `{1,3}` reads as an
+interpolation span and gets silently mangled — write `{{1,3}}` (doubled
+braces) in any pattern that needs one. `lib/regex.nyx` (below) already
+does this.
 
 **Standard library — `lib/`** (all written in NyxScript itself, `import
 "lib/NAME.nyx" as alias` same as any other library):
 `math.nyx` (`mod`, `clamp`, `mean`, `median`, `gcd`, `is_prime`),
 `dict.nyx` (`merge`, `pick`, `invert`, `from_pairs`), `validate.nyx`
 (`is_valid_port`, `is_valid_ipv4`, `is_valid_domain`), `collection.nyx`
-(`unique`, `chunk`), `strings.nyx` (`title_case`, `truncate`),
-`finding.nyx` (`count_by_severity`, `total_findings`, `worst_severity`,
-`summary_line`), `report.nyx` (`severity_breakdown`, `print_summary`).
+(`unique`, `chunk`, `flatten`, `partition`, `take`, `drop`, `sum_by`),
+`strings.nyx` (`title_case`, `truncate`), `finding.nyx`
+(`count_by_severity`, `total_findings`, `worst_severity`,
+`summary_line`), `report.nyx` (`severity_breakdown`, `print_summary`),
+`lambdas.nyx` (`identity`, `constant`, `compose`, `pipe`, `flip`,
+`partial`, `negate`, `any_of`, `all_of`, `none_of`, `count_where`,
+`find_where`, `flat_map`, `group_by`, `times` — combinators built on
+`map`/`filter`/`sort_by`/`reduce`), `set.nyx` (`union`, `intersect`,
+`difference`, `symmetric_difference`, `is_subset`, `is_disjoint`),
+`net.nyx` (`host_from_target`, `port_from_target`, `octets`,
+`is_private_ipv4`), `format.nyx` (`pad_left`, `pad_right`,
+`human_bytes`, `human_duration`, `bullet_list`), `time.nyx` (`elapsed`,
+`is_older_than`, `humanize`, `now_iso`, `backoff_delay`, `time_it`),
+`asset.nyx` (`by_kind`, `kinds`, `identifiers`, `count_by_kind`,
+`group_by_kind`, `attr`, `has_attr`, `has_source`, `source_or`,
+`summary_line` — for the `.assets` a module like `network.discover`
+attaches to its result), `hash.nyx` (`short_hash`, `fingerprint`,
+`has_changed` — fingerprinting/dedup, not password hashing), `csv.nyx`
+(`parse_csv`, `to_csv` — quote-aware, no `--unsafe` needed), `regex.nyx`
+(`extract_ips`, `extract_emails`, `extract_urls`, `matches_any`).
 Reach for these before reimplementing — e.g. don't hand-roll a dict merge
-when `dict.merge(a, b)` already exists.
+when `dict.merge(a, b)` already exists, or a retry loop when
+`time.backoff_delay` already does exponential backoff.
+
+**Full worked examples**: see the
+[NyxScript Cookbook wiki page](https://github.com/ivnovomi/nyxor/wiki/NyxScript-Cookbook)
+for seven runnable scripts combining several of these modules (batch
+CSV export, hash-based change detection, retry with backoff, IOC
+extraction, grouping findings by severity, an interactive triage flow).
 
 **Interactive UI — `ui.*`** (works unchanged from both CLI and TUI):
 `ui.confirm(msg) -> bool`, `ui.input(prompt) -> string`,
@@ -211,6 +249,21 @@ run without `--unsafe` (CLI) or the MCP `run_nyxscript` tool (which
 execution through this path, by design). Don't reach for these unless
 the task genuinely needs a Python library NyxScript has no built-in for;
 prefer the built-ins and scan modules first.
+
+A script can also self-enable them with a bare `unsafe` statement
+(typically the first line), instead of the caller passing `--unsafe`:
+
+```
+unsafe
+python:
+    result = 6 * 7
+end
+print result
+```
+
+`nyx script lint` surfaces this as a warning (doesn't block execution)
+so it stays visible. Still not reachable via the MCP `run_nyxscript`
+tool regardless of what the script itself contains.
 
 ```
 pip "requests"
