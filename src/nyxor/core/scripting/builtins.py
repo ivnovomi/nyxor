@@ -30,10 +30,21 @@ def _len(args: list[Any]) -> int:
     return len(args[0])
 
 
+#: `range()` eagerly materializes a Python list (there's no lazy iterator
+#: type in NyxScript) — without a cap, `range(10**12)` would try to
+#: allocate a list that large in one call, no loop or --unsafe required.
+#: Matches the interpreter's MAX_LOOP_ITERATIONS order of magnitude.
+_MAX_RANGE_LEN = 1_000_000
+
+
 def _range(args: list[Any]) -> list[int]:
     if not (1 <= len(args) <= 3):
         raise _arity_error("range", "1 to 3 arguments", len(args))
-    return list(range(*(int(a) for a in args)))
+    bounds = tuple(int(a) for a in args)
+    span = len(range(*bounds))
+    if span > _MAX_RANGE_LEN:
+        raise ValueError(f"range() would produce {span:,} items (limit {_MAX_RANGE_LEN:,})")
+    return list(range(*bounds))
 
 
 def _upper(args: list[Any]) -> str:

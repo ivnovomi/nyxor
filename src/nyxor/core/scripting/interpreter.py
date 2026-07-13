@@ -83,10 +83,30 @@ _FORMAT_BY_SUFFIX = {
     "sarif": "sarif",
 }
 
+# `[x] * n` / `"x" * n` (sequence repetition) can allocate an arbitrarily
+# large result from a single multiplication of two tiny operands — unlike
+# `+`, which can only ever produce something as big as its two operands
+# combined. Same class of danger as an unbounded `while` loop, so cap it
+# the same order of magnitude as MAX_LOOP_ITERATIONS.
+_MAX_SEQUENCE_LEN = 1_000_000
+
+
+def _multiply(a: Any, b: Any) -> Any:
+    for seq, factor in ((a, b), (b, a)):
+        is_sequence = isinstance(seq, list | str)
+        is_plain_int = isinstance(factor, int) and not isinstance(factor, bool)
+        if is_sequence and is_plain_int and len(seq) * max(factor, 0) > _MAX_SEQUENCE_LEN:
+            raise ValueError(
+                f"'*' would produce a sequence of {len(seq) * factor:,} items "
+                f"(limit {_MAX_SEQUENCE_LEN:,})"
+            )
+    return a * b
+
+
 _BIN_OPS: dict[str, Callable[[Any, Any], Any]] = {
     "+": lambda a, b: a + b,
     "-": lambda a, b: a - b,
-    "*": lambda a, b: a * b,
+    "*": _multiply,
     "/": lambda a, b: a / b,
     "==": lambda a, b: a == b,
     "!=": lambda a, b: a != b,
@@ -309,6 +329,8 @@ class Interpreter:
                     ) from exc
                 except ZeroDivisionError as exc:
                     raise RuntimeScriptError("division by zero", line=line) from exc
+                except ValueError as exc:
+                    raise RuntimeScriptError(str(exc), line=line) from exc
         raise RuntimeScriptError(f"cannot evaluate expression: {expr!r}")
 
     async def _eval_index(self, target: Expr, index_expr: Expr, line: int) -> Any:

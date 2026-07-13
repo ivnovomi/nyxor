@@ -1,0 +1,125 @@
+# Functional combinators for NyxScript — map/filter/sort_by/reduce are
+# already native (they need to call a lambda per item, which a plain
+# builtin can't do), so this module is everything *built on top* of those:
+# composing functions, partial application, predicate combinators, and a
+# few list ops the native HOFs don't cover.
+#
+# Naming note: none of these are called `find`, `min`, `max`, `sum`, etc.
+# on purpose — a bare (unqualified) call always resolves against NyxScript's
+# builtins first, even inside this file, so a local function sharing a
+# builtin's name would be silently shadowed rather than override it.
+
+func identity(x):
+    "Returns x unchanged — the identity function, useful as a default fn."
+    return x
+end
+
+func constant(x):
+    "Returns a function that ignores its argument and always returns x."
+    return lambda(_ignored): x
+end
+
+func compose(f, g):
+    "Right-to-left composition: compose(f, g)(x) == f(g(x))."
+    return lambda(x): f(g(x))
+end
+
+func pipe(f, g):
+    "Left-to-right composition: pipe(f, g)(x) == g(f(x))."
+    return lambda(x): g(f(x))
+end
+
+func flip(f):
+    "Returns f with its first two arguments swapped."
+    return lambda(a, b): f(b, a)
+end
+
+func partial(f, a):
+    "Fixes f's first argument to a, returning a 1-argument function."
+    return lambda(b): f(a, b)
+end
+
+func negate(pred):
+    "Returns a predicate that's true exactly when pred is false."
+    return lambda(x): not pred(x)
+end
+
+func any_of(items, pred):
+    "True if pred(item) is truthy for at least one item."
+    foreach item in items:
+        if pred(item):
+            return true
+        end
+    end
+    return false
+end
+
+func all_of(items, pred):
+    "True if pred(item) is truthy for every item (vacuously true if empty)."
+    foreach item in items:
+        if not pred(item):
+            return false
+        end
+    end
+    return true
+end
+
+func none_of(items, pred):
+    "True if pred(item) is falsy for every item."
+    return not any_of(items, pred)
+end
+
+func count_where(items, pred):
+    "Counts items for which pred(item) is truthy."
+    set n = 0
+    foreach item in items:
+        if pred(item):
+            set n = n + 1
+        end
+    end
+    return n
+end
+
+func find_where(items, pred, default):
+    "The first item for which pred(item) is truthy, or default if none match."
+    foreach item in items:
+        if pred(item):
+            return item
+        end
+    end
+    return default
+end
+
+func flat_map(items, fn):
+    "Maps fn over items (each call must return a list) and flattens one level."
+    set out = []
+    foreach item in items:
+        foreach inner in fn(item):
+            set out = out + [inner]
+        end
+    end
+    return out
+end
+
+func group_by(items, key_fn):
+    "Buckets items into a dict of key_fn(item) -> [items with that key]."
+    set out = {}
+    foreach item in items:
+        set k = key_fn(item)
+        if contains(keys(out), k):
+            set out[k] = out[k] + [item]
+        else:
+            set out[k] = [item]
+        end
+    end
+    return out
+end
+
+func times(n, fn):
+    "Calls fn(i) for i in 0..n-1 and collects the results into a list."
+    set out = []
+    foreach i in range(n):
+        set out = out + [fn(i)]
+    end
+    return out
+end
