@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from nyxor.plugins.tui.app import NyxorApp
@@ -41,6 +43,48 @@ async def test_prefix_at_the_minimum_length_suggests() -> None:
         editor.move_cursor((0, 3))
         _prefix, matches = editor.completion_context()
         assert "print" in matches
+
+
+@pytest.mark.asyncio
+async def test_completion_follows_an_imported_library_alias() -> None:
+    # Regression: completion used to be a fixed keyword/builtin list built
+    # once at class-definition time, so it never knew about the functions
+    # in a script's own `import ... as alias` — typing "asset." offered
+    # nothing. Imports resolve relative to cwd (matching the interpreter),
+    # which Textual's test harness isolates to a per-test tmp dir — so the
+    # library lives there rather than depending on this repo's real lib/.
+    app = NyxorApp()
+    async with app.run_test():
+        lib_dir = Path.cwd() / "lib"
+        lib_dir.mkdir(exist_ok=True)
+        (lib_dir / "demo.nyx").write_text(
+            'func square(x):\n    "Squares x."\n    return x * x\nend\n'
+            "func cube(x):\n    return x * x * x\nend\n",
+            encoding="utf-8",
+        )
+
+        editor = app.query_one("#script-editor", NyxScriptEditor)
+        editor.text = 'import "lib/demo.nyx" as demo\n\ndemo.'
+        editor.move_cursor((2, len("demo.")))
+        prefix, matches = editor.completion_context()
+        assert prefix == "demo."
+        assert "demo.square" in matches
+        assert "demo.cube" in matches
+        # None of the generic keyword/builtin soup belongs here.
+        assert not any(m in matches for m in ("print", "set", "func"))
+
+
+@pytest.mark.asyncio
+async def test_completion_after_ui_dot_lists_ui_functions() -> None:
+    app = NyxorApp()
+    async with app.run_test():
+        editor = app.query_one("#script-editor", NyxScriptEditor)
+        editor.text = "ui."
+        editor.move_cursor((0, 3))
+        prefix, matches = editor.completion_context()
+        assert prefix == "ui."
+        assert "ui.confirm" in matches
+        assert "ui.table" in matches
 
 
 @pytest.mark.asyncio

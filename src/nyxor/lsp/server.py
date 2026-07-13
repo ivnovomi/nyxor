@@ -30,8 +30,10 @@ from nyxor.lsp.analysis import (
     FunctionInfo,
     find_nyx_files,
     function_hover_text,
+    function_signature,
     parse_best_effort,
     resolve_import_path,
+    scan_imports,
     top_level_functions,
     top_level_imports,
 )
@@ -100,6 +102,7 @@ _MODULE_DOCS = {
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.]*")
 _VAR_DEF_RE = re.compile(r"\b(?:set|foreach|as|func)\s+(\w+)\b")
 _IMPORT_PATH_RE = re.compile(r'\bimport\s+"([^"]*)$')
+_MEMBER_ACCESS_RE = re.compile(r"([A-Za-z_]\w*)\.\w*$")
 
 
 def _word_at(document: TextDocument, position: types.Position) -> str | None:
@@ -223,9 +226,63 @@ def _import_path_completions(ls: LanguageServer, current_uri: str) -> types.Comp
     return types.CompletionList(is_incomplete=False, items=items)
 
 
+def _module_member_completions(
+    ls: LanguageServer, document: TextDocument, alias: str
+) -> types.CompletionList | None:
+    """Completions for `alias.<partial>` — the functions of an imported
+
+    library, resolved the same way hover/go-to-definition already do (an
+    editor typing `asset.` should see `by_kind`, `kinds`, etc., not the
+    generic keyword/builtin soup). Returns None when `alias` isn't `ui` or
+    a known import in this document, so the caller can fall back sanely.
+    """
+    if alias == "ui":
+        return types.CompletionList(
+            is_incomplete=False,
+            items=[
+                types.CompletionItem(
+                    label=name,
+                    kind=types.CompletionItemKind.Function,
+                    detail=_UI_DOCS.get(f"ui.{name}", ""),
+                )
+                for name in sorted(UI_FUNCTIONS)
+            ],
+        )
+
+    imports = scan_imports(document.source)
+    if alias not in imports:
+        return None
+
+    root_path = ls.workspace.root_path
+    if not root_path:
+        return None
+    target = resolve_import_path(Path(root_path), imports[alias])
+    if not target.is_file():
+        return None
+    lib_program = parse_best_effort(target.read_text(encoding="utf-8"))
+    if lib_program is None:
+        return None
+
+    functions = top_level_functions(lib_program)
+    return types.CompletionList(
+        is_incomplete=False,
+        items=[
+            types.CompletionItem(
+                label=name,
+                kind=types.CompletionItemKind.Function,
+                detail=function_signature(info),
+                documentation=types.MarkupContent(
+                    kind=types.MarkupKind.Markdown, value=info.doc or "*(no docstring)*"
+                ),
+            )
+            for name, info in sorted(functions.items())
+        ],
+    )
+
+
 @server.feature(
     types.TEXT_DOCUMENT_COMPLETION,
-    types.CompletionOptions(trigger_characters=[*"abcdefghijklmnopqrstuvwxyz", '"']),
+    types.CompletionOptions(trigger_characters=[*"abcdefghijklmnopqrstuvwxyz", '"', "."]),
 )
 def completions(ls: LanguageServer, params: types.CompletionParams) -> types.CompletionList:
     document = ls.workspace.get_text_document(params.text_document.uri)
@@ -235,6 +292,14 @@ def completions(ls: LanguageServer, params: types.CompletionParams) -> types.Com
         before_cursor = lines[params.position.line][: params.position.character]
         if _IMPORT_PATH_RE.search(before_cursor):
             return _import_path_completions(ls, document.uri)
+
+        member_match = _MEMBER_ACCESS_RE.search(before_cursor)
+        if member_match:
+            member_completions = _module_member_completions(ls, document, member_match.group(1))
+            # A dot that isn't a recognized module/import alias (e.g. still
+            # mid-typing) shouldn't fall through to the generic keyword
+            # list — none of those can ever be valid there.
+            return member_completions or types.CompletionList(is_incomplete=False, items=[])
 
     variables = sorted(set(_VAR_DEF_RE.findall(document.source)))
 

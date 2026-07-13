@@ -170,3 +170,63 @@ def test_normal_completion_is_unaffected_outside_an_import_statement(
     )
     labels = {item.label for item in result.items}
     assert "print" in labels
+
+
+def test_completion_after_an_imported_alias_dot_lists_its_functions(
+    server, tmp_path: Path
+) -> None:
+    main_source = 'import "lib/mathlib.nyx" as math\n\nmath.'
+    lib_source = (
+        'func square(x):\n    "Returns x squared."\n    return x * x\nend\n\n'
+        "func cube(x):\n    return x * x * x\nend\n"
+    )
+    ws = _workspace_with(tmp_path, {"main.nyx": main_source, "lib/mathlib.nyx": lib_source})
+    server.protocol._workspace = ws
+    uri = (tmp_path / "main.nyx").as_uri()
+
+    result = completions(
+        server,
+        types.CompletionParams(
+            text_document=types.TextDocumentIdentifier(uri=uri), position=_pos(2, len("math."))
+        ),
+    )
+
+    labels = {item.label for item in result.items}
+    assert labels == {"square", "cube"}
+    square = next(item for item in result.items if item.label == "square")
+    assert square.detail == "func square(x)"
+    assert square.documentation.value == "Returns x squared."
+    # The generic keyword/builtin soup must not leak in alongside the
+    # library's own functions — right after a dot, nothing else is valid.
+    assert "print" not in labels
+    assert "set" not in labels
+
+
+def test_completion_after_ui_dot_lists_ui_functions(server, tmp_path: Path) -> None:
+    ws = _workspace_with(tmp_path, {"main.nyx": "ui."})
+    server.protocol._workspace = ws
+    uri = (tmp_path / "main.nyx").as_uri()
+
+    result = completions(
+        server,
+        types.CompletionParams(
+            text_document=types.TextDocumentIdentifier(uri=uri), position=_pos(0, 3)
+        ),
+    )
+    labels = {item.label for item in result.items}
+    assert "confirm" in labels
+    assert "table" in labels
+
+
+def test_completion_after_an_unknown_alias_dot_returns_nothing(server, tmp_path: Path) -> None:
+    ws = _workspace_with(tmp_path, {"main.nyx": "nope."})
+    server.protocol._workspace = ws
+    uri = (tmp_path / "main.nyx").as_uri()
+
+    result = completions(
+        server,
+        types.CompletionParams(
+            text_document=types.TextDocumentIdentifier(uri=uri), position=_pos(0, 5)
+        ),
+    )
+    assert result.items == []

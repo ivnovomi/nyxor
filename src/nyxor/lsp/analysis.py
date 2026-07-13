@@ -9,12 +9,15 @@ the LSP stack at all, and keeps `server.py` itself a thin adapter over it.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 from nyxor.core.scripting import FuncDef, ImportStmt, Program, function_docstring, parse
 from nyxor.core.scripting.ast_nodes import Literal
 from nyxor.core.scripting.errors import ScriptError
+
+_IMPORT_LINE_RE = re.compile(r'import\s+"([^"]+)"\s+as\s+(\w+)')
 
 
 @dataclass(frozen=True)
@@ -70,6 +73,20 @@ def top_level_imports(program: Program) -> dict[str, ImportInfo]:
         ):
             imports[stmt.alias] = ImportInfo(alias=stmt.alias, path=stmt.path.value, line=stmt.line)
     return imports
+
+
+def scan_imports(source: str) -> dict[str, str]:
+    """Alias -> import path, found with a regex instead of a full parse.
+
+    For completion: the document is very often mid-edit (e.g. the line
+    right after typing `asset.` isn't valid NyxScript yet), so
+    `top_level_imports` — which needs the *whole* document to parse
+    successfully — would go blind at exactly the moment completion is
+    needed most. The `import` lines themselves are essentially never what's
+    actively being typed, so scanning for them directly is robust to
+    syntax errors anywhere else in the buffer.
+    """
+    return {alias: path for path, alias in _IMPORT_LINE_RE.findall(source)}
 
 
 def function_signature(info: FunctionInfo) -> str:

@@ -16,6 +16,7 @@ editing rather than crashing.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import ClassVar
 
 from rich.style import Style
@@ -27,6 +28,12 @@ from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
 from nyxor.core.scripting.lexer import KEYWORDS, tokenize
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
 from nyxor.core.scripting.ui import UI_FUNCTIONS
+from nyxor.lsp.analysis import (
+    parse_best_effort,
+    resolve_import_path,
+    scan_imports,
+    top_level_functions,
+)
 
 NYX_THEME = TextAreaTheme(
     name="nyxor",
@@ -284,6 +291,27 @@ class NyxScriptEditor(TextArea):
             names.update(re.findall(pattern, self.text))
         return names
 
+    def _imported_functions(self) -> dict[str, list[str]]:
+        """Alias -> sorted function names for every `import "..." as alias`
+
+        in the buffer that resolves to a real, parseable .nyx file — so
+        typing `asset.` offers `by_kind`, `kinds`, etc. instead of nothing,
+        the same dynamic resolution `nyx script lsp` does for editors that
+        talk LSP. Resolved against the current working directory, matching
+        how the interpreter itself resolves imports (never relative to the
+        editor's own open file).
+        """
+        out: dict[str, list[str]] = {}
+        for alias, path in scan_imports(self.text).items():
+            target = resolve_import_path(Path.cwd(), path)
+            if not target.is_file():
+                continue
+            lib_program = parse_best_effort(target.read_text(encoding="utf-8"))
+            if lib_program is None:
+                continue
+            out[alias] = sorted(top_level_functions(lib_program))
+        return out
+
     def completion_context(self) -> tuple[str, list[str]]:
         """Return ``(prefix, matches)`` for the word under the cursor, if any.
 
@@ -307,7 +335,14 @@ class NyxScriptEditor(TextArea):
         ):
             return "", []
 
-        candidates = sorted(self._COMPLETION_WORDS + sorted(self._known_variables()))
+        alias = prefix.rpartition(".")[0] if "." in prefix else ""
+        if alias == "ui":
+            candidates = [f"ui.{name}" for name in sorted(UI_FUNCTIONS)]
+        elif alias and alias in (imported := self._imported_functions()):
+            candidates = [f"{alias}.{name}" for name in imported[alias]]
+        else:
+            candidates = sorted(self._COMPLETION_WORDS + sorted(self._known_variables()))
+
         matches = [c for c in candidates if c.startswith(prefix) and c != prefix]
         return prefix, matches
 
