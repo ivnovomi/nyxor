@@ -128,6 +128,11 @@ async def run_nyxscript(source: str) -> str:
     ``python:``/``pip`` blocks are disabled (this tool never passes
     ``--unsafe``), so a script can only do what NyxScript's own sandboxed
     grammar allows — no arbitrary code execution reachable from an MCP call.
+    ``allow_unsafe_directive=False`` closes the one gap that would otherwise
+    leave: a script's own ``unsafe`` statement (see the language guide)
+    flips this on for anyone running it locally, but that same statement is
+    refused outright here — `unsafe=False` on this path is a hard ceiling,
+    not just a starting value a submitted script could raise itself.
     """
     issues = lint_source(source)
     errors = [issue for issue in issues if issue.severity == "error"]
@@ -138,7 +143,13 @@ async def run_nyxscript(source: str) -> str:
 
     output_lines: list[str] = []
     try:
-        await run_script(source, load_config(), output=output_lines.append, unsafe=False)
+        await run_script(
+            source,
+            load_config(),
+            output=output_lines.append,
+            unsafe=False,
+            allow_unsafe_directive=False,
+        )
     except Exception as exc:  # surface any NyxScript error as tool output, not a server crash
         output_lines.append(f"Error: {exc}")
     return "\n".join(output_lines) if output_lines else "(no output)"

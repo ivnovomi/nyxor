@@ -188,12 +188,21 @@ class Interpreter:
         output: OutputFn = print,
         base_dir: Path | None = None,
         unsafe: bool = False,
+        allow_unsafe_directive: bool = True,
         ui: ScriptUI | None = None,
     ) -> None:
         self.config = config
         self.output = output
         self.base_dir = base_dir or Path.cwd()
         self.unsafe = unsafe
+        # `unsafe=False` above is only the *starting* value — a script's own
+        # `unsafe` statement can flip self.unsafe to True at runtime. Callers
+        # that need a hard ceiling regardless of script content (the MCP
+        # server: an agent can submit arbitrary script text with no human
+        # confirming each call) set this False so that statement is refused
+        # outright instead of silently granting what --unsafe=False was
+        # supposed to withhold.
+        self._allow_unsafe_directive = allow_unsafe_directive
         self.ui = ui or ScriptUI()
         self._env_stack: list[dict[str, Any]] = [{}]
         self.call_stack: list[dict[str, Any]] = []
@@ -604,7 +613,13 @@ class Interpreter:
                 raise _BreakSignal
             case ContinueStmt():
                 raise _ContinueSignal
-            case UnsafeStmt():
+            case UnsafeStmt(line=line):
+                if not self.unsafe and not self._allow_unsafe_directive:
+                    raise RuntimeScriptError(
+                        "'unsafe' is disabled by the caller and cannot be "
+                        "self-enabled by a script here (e.g. the MCP server)",
+                        line=line,
+                    )
                 self.unsafe = True
             case FuncDef(name=name, params=params, body=body):
                 self.env[name] = NyxFunction(
@@ -776,8 +791,16 @@ async def run_script(
     output: OutputFn = print,
     base_dir: Path | None = None,
     unsafe: bool = False,
+    allow_unsafe_directive: bool = True,
     ui: ScriptUI | None = None,
 ) -> None:
     """Parse and execute a NyxScript source string end to end."""
     program = parse(source)
-    await Interpreter(config, output=output, base_dir=base_dir, unsafe=unsafe, ui=ui).run(program)
+    await Interpreter(
+        config,
+        output=output,
+        base_dir=base_dir,
+        unsafe=unsafe,
+        allow_unsafe_directive=allow_unsafe_directive,
+        ui=ui,
+    ).run(program)
