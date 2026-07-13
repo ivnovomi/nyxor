@@ -44,7 +44,9 @@ async def test_run_audit_resolves_a_bare_hostname_for_dns_given_a_full_url(
     async def fake_tls_run_inspect(target: str, timeout: float) -> ModuleResult:
         return ModuleResult(module="tls.inspect", target=target)
 
-    async def fake_http_run_inspect(url: str, config: object) -> ModuleResult:
+    async def fake_http_run_inspect(
+        url: str, config: object, *, validate_url: object = None
+    ) -> ModuleResult:
         return ModuleResult(module="http.inspect", target=url)
 
     monkeypatch.setattr("nyxor.plugins.audit.plugin.dns_run_lookup", fake_dns_run_lookup)

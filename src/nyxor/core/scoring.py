@@ -10,6 +10,7 @@ job it's actually used for (`nyx audit`, `nyx watch`).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from xml.sax.saxutils import escape as xml_escape
 
 from rich.text import Text
 
@@ -97,6 +98,9 @@ def score_results(results: list[ModuleResult]) -> SecurityScore:
 def render_badge(score: SecurityScore, *, label: str = "security") -> str:
     """Render a shields.io-style flat SVG badge for ``score`` (e.g. "security: A+")."""
     value = score.grade
+    # Widths are computed from the raw (unescaped) lengths so the layout
+    # isn't thrown off by entity expansion — only the text actually written
+    # into the SVG needs escaping.
     label_width = int(len(label) * 6.5) + 20
     value_width = int(len(value) * 7.5) + 20
     total_width = label_width + value_width
@@ -104,8 +108,17 @@ def render_badge(score: SecurityScore, *, label: str = "security") -> str:
     label_x = label_width / 2
     value_x = label_width + value_width / 2
 
+    # `label` can be attacker-controlled (e.g. the REST API's
+    # /badge/{domain}.svg passes the raw URL path segment) — escape before
+    # interpolating into XML/SVG to prevent markup/script injection. Both
+    # land inside a double-quoted attribute (aria-label) as well as text
+    # content, so quotes need escaping too, not just the default `&<>`.
+    _attr_entities = {'"': "&quot;", "'": "&apos;"}
+    safe_label = xml_escape(label, _attr_entities)
+    safe_value = xml_escape(value, _attr_entities)
+
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{total_width}" height="20" \
-role="img" aria-label="{label}: {value}">
+role="img" aria-label="{safe_label}: {safe_value}">
   <linearGradient id="s" x2="0" y2="100%">
     <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
     <stop offset="1" stop-opacity=".1"/>
@@ -117,8 +130,8 @@ role="img" aria-label="{label}: {value}">
     <rect width="{total_width}" height="20" fill="url(#s)"/>
   </g>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,sans-serif" font-size="11">
-    <text x="{label_x}" y="14">{label}</text>
-    <text x="{value_x}" y="14">{value}</text>
+    <text x="{label_x}" y="14">{safe_label}</text>
+    <text x="{value_x}" y="14">{safe_value}</text>
   </g>
 </svg>
 """

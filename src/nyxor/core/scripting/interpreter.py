@@ -642,7 +642,19 @@ class Interpreter:
             )
 
         path_str = _format_value(await self.eval_expr(path_expr))
-        path = self.base_dir / path_str
+        base = self.base_dir.resolve()
+        # `Path.__truediv__` silently discards `base` if `path_str` is
+        # absolute (e.g. "/etc/cron.d/x" or "C:\Windows\x"), and ".."
+        # segments can walk out of `base` even when it isn't — so resolve
+        # and check containment explicitly. Scripts run without --unsafe
+        # must not be able to write outside their own working directory.
+        path = (base / path_str).resolve()
+        if not path.is_relative_to(base):
+            raise RuntimeScriptError(
+                f"'save ... as {path_str!r}' would write outside the script's "
+                f"working directory ({base}) — not allowed.",
+                line=line,
+            )
         fmt = _FORMAT_BY_SUFFIX.get(path.suffix.lstrip(".").lower(), "json")
         document = ReportDocument(title="NYXOR Script Report", results=results)
         get_writer(fmt).write(document, path)

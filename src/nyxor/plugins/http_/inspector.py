@@ -3,11 +3,14 @@ common security header checks."""
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 import httpx
 
 from nyxor.plugins.http_.fingerprint import fingerprint
+
+ValidateUrl = Callable[[str], Awaitable[None]]
 
 SECURITY_HEADERS = (
     "strict-transport-security",
@@ -30,8 +33,20 @@ def _describe_cookie(cookie: Any) -> dict[str, Any]:
 
 
 async def inspect(
-    url: str, timeout: float, follow_redirects: bool, max_redirects: int
+    url: str,
+    timeout: float,
+    follow_redirects: bool,
+    max_redirects: int,
+    *,
+    validate_url: ValidateUrl | None = None,
 ) -> dict[str, Any]:
+    """``validate_url`` (if given) is awaited on the initial URL and again on
+
+    every redirect hop before it's fetched — redirects are followed manually
+    precisely so each one can be checked, not just the URL the caller
+    passed in. Callers that don't need that (the CLI, which is meant to be
+    able to point at internal/private targets on purpose) simply omit it.
+    """
     redirect_chain: list[dict[str, Any]] = []
 
     async with httpx.AsyncClient(
@@ -40,6 +55,8 @@ async def inspect(
         current_url = url
         response: httpx.Response | None = None
         for _ in range(max_redirects + 1):
+            if validate_url is not None:
+                await validate_url(current_url)
             response = await client.get(current_url)
             if follow_redirects and response.is_redirect:
                 location = response.headers.get("location", "")

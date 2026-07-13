@@ -53,6 +53,17 @@ def test_render_badge_embeds_label_and_grade() -> None:
     assert score.color in svg
 
 
+def test_render_badge_escapes_a_malicious_label() -> None:
+    # `label` can be attacker-controlled (the REST API's /badge/{domain}.svg
+    # passes the raw URL path segment) — a crafted "domain" must not be able
+    # to break out of the SVG attribute/text context it's placed in.
+    score = score_results([_result_with(Severity.INFO)])
+    payload = '"><script>alert(1)</script>'
+    svg = render_badge(score, label=payload)
+    assert "<script>" not in svg
+    assert payload not in svg
+
+
 def test_worst_severity_is_none_with_no_findings() -> None:
     score = score_results([_result_with()])
     assert score.worst_severity is None

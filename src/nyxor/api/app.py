@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+from html import escape as html_escape
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -77,13 +78,13 @@ def create_app(config: NyxorConfig | None = None) -> FastAPI:
     @limiter.limit(SCAN_RATE_LIMIT)
     async def audit(request: Request, domain: str) -> list[ModuleResult]:
         await _ensure_public_target(domain)
-        return await run_audit(domain, config)
+        return await run_audit(domain, config, validate_url=_ensure_public_target)
 
     @app.get("/audit/{domain}/score")
     @limiter.limit(SCAN_RATE_LIMIT)
     async def audit_score(request: Request, domain: str) -> dict[str, object]:
         await _ensure_public_target(domain)
-        results = await run_audit(domain, config)
+        results = await run_audit(domain, config, validate_url=_ensure_public_target)
         score = score_results(results)
         return _score_payload(domain, score)
 
@@ -92,7 +93,7 @@ def create_app(config: NyxorConfig | None = None) -> FastAPI:
     async def badge(request: Request, domain: str) -> Response:
         """A live-generated shields.io-style badge — re-audits on every request."""
         await _ensure_public_target(domain)
-        results = await run_audit(domain, config)
+        results = await run_audit(domain, config, validate_url=_ensure_public_target)
         score = score_results(results)
         svg = render_badge(score, label=domain)
         return Response(content=svg, media_type="image/svg+xml")
@@ -113,7 +114,7 @@ def create_app(config: NyxorConfig | None = None) -> FastAPI:
     @limiter.limit(SCAN_RATE_LIMIT)
     async def http(request: Request, url: str) -> ModuleResult:
         await _ensure_public_target(url)
-        return await http_run_inspect(url, config.http)
+        return await http_run_inspect(url, config.http, validate_url=_ensure_public_target)
 
     @app.get("/inventory")
     async def inventory(
@@ -139,11 +140,16 @@ def create_app(config: NyxorConfig | None = None) -> FastAPI:
 
     @app.get("/oauth/device", response_class=HTMLResponse)
     async def oauth_device_page(user_code: str = "") -> str:
+        # `user_code` is an attacker-controllable query param reflected into
+        # this page — escape it before interpolating, or a crafted link
+        # (e.g. ?user_code="><script>...) could hijack the approval the
+        # user thinks they're granting to their own device.
+        safe_user_code = html_escape(user_code, quote=True)
         return f"""<!DOCTYPE html><html><head><title>NYXOR device login</title></head>
 <body style="font-family:monospace;max-width:420px;margin:64px auto">
 <h2>Approve CLI login</h2>
 <form method="post" action="/oauth/device/approve">
-  <input name="user_code" value="{user_code}" placeholder="XXXX-XXXX"
+  <input name="user_code" value="{safe_user_code}" placeholder="XXXX-XXXX"
     style="font-size:1.2em;padding:8px;width:100%;box-sizing:border-box" autofocus>
   <button type="submit" style="margin-top:12px;padding:8px 16px">Approve</button>
 </form>

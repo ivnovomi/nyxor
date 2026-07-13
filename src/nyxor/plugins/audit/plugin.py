@@ -25,6 +25,7 @@ from nyxor.core.output import SEVERITY_STYLE, emit_results
 from nyxor.core.scoring import render_badge, render_terminal_badge, score_results
 from nyxor.plugins.analyze.advisor import dumber_writeup, fix_suggestions
 from nyxor.plugins.dns_.plugin import run_lookup as dns_run_lookup
+from nyxor.plugins.http_.inspector import ValidateUrl
 from nyxor.plugins.http_.plugin import run_inspect as http_run_inspect
 from nyxor.plugins.inventory.store import InventoryStore
 from nyxor.plugins.tls_.plugin import run_inspect as tls_run_inspect
@@ -49,12 +50,18 @@ def _hostname_for_dns(domain: str) -> str:
     return domain
 
 
-async def run_audit(domain: str, config: NyxorConfig) -> list[ModuleResult]:
-    """Run DNS, TLS, and HTTP checks against ``domain`` concurrently."""
+async def run_audit(
+    domain: str, config: NyxorConfig, *, validate_url: ValidateUrl | None = None
+) -> list[ModuleResult]:
+    """Run DNS, TLS, and HTTP checks against ``domain`` concurrently.
+
+    ``validate_url``, if given, gates the HTTP check's initial request and
+    every redirect hop — see :func:`nyxor.plugins.http_.plugin.run_inspect`.
+    """
     dns_result, tls_result, http_result = await asyncio.gather(
         dns_run_lookup(_hostname_for_dns(domain), config.dns.resolvers, config.dns.timeout_seconds),
         tls_run_inspect(domain, config.tls.timeout_seconds),
-        http_run_inspect(domain, config.http),
+        http_run_inspect(domain, config.http, validate_url=validate_url),
     )
     return [dns_result, tls_result, http_result]
 

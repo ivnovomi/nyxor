@@ -11,7 +11,7 @@ from nyxor.core.context import NyxorContext
 from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import Finding, ModuleResult, Severity
 from nyxor.core.output import emit_results
-from nyxor.plugins.http_.inspector import inspect
+from nyxor.plugins.http_.inspector import ValidateUrl, inspect
 
 http_app = typer.Typer(
     name="http",
@@ -20,15 +20,27 @@ http_app = typer.Typer(
 )
 
 
-async def run_inspect(url: str, config: HttpConfig) -> ModuleResult:
-    """Inspect the HTTP response for a URL and return a ModuleResult."""
+async def run_inspect(
+    url: str, config: HttpConfig, *, validate_url: ValidateUrl | None = None
+) -> ModuleResult:
+    """Inspect the HTTP response for a URL and return a ModuleResult.
+
+    ``validate_url``, if given, is checked against the initial URL and every
+    redirect hop (see :func:`nyxor.plugins.http_.inspector.inspect`) — used
+    by the REST API to enforce its SSRF guard past redirects, not needed by
+    the CLI/TUI/NyxScript, which are allowed to target internal hosts.
+    """
     if not url.startswith(("http://", "https://")):
         url = f"https://{url}"
 
     result = ModuleResult(module="http.inspect", target=url)
     try:
         info = await inspect(
-            url, config.timeout_seconds, config.follow_redirects, config.max_redirects
+            url,
+            config.timeout_seconds,
+            config.follow_redirects,
+            config.max_redirects,
+            validate_url=validate_url,
         )
     except Exception as exc:
         result.errors.append(str(exc))

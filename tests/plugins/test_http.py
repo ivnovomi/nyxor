@@ -53,7 +53,7 @@ def test_security_headers_cover_common_hardening_headers() -> None:
 
 @pytest.mark.asyncio
 async def test_run_inspect_builds_a_valid_finding_for_a_redirect_chain(monkeypatch) -> None:
-    async def fake_inspect(url, timeout, follow_redirects, max_redirects):
+    async def fake_inspect(url, timeout, follow_redirects, max_redirects, *, validate_url=None):
         return {
             "status_code": 200,
             "final_url": "https://www.example.com/",
