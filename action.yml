@@ -79,14 +79,16 @@ runs:
         NYXOR_REF: ${{ inputs.nyxor-ref }}
         NYXOR_FAIL_ON: ${{ inputs.fail-on }}
       run: |
-        # No `-e`, and this step (and this whole composite action) never
-        # exits non-zero over `--fail-on` on purpose: if a composite
-        # action step fails, none of its declared `outputs:` reach the
-        # calling workflow — including `grade`, which has nothing to do
-        # with fail-on. So `nyx audit --fail-on` exiting non-zero is
-        # captured into the `exceeded` output below instead, and it's up
-        # to the calling workflow to act on it (see README) — that keeps
-        # `grade` reliable regardless of whether fail-on tripped.
+        # This step (and this whole composite action) never exits non-zero
+        # over `--fail-on` on purpose: if a composite action step fails,
+        # none of its declared `outputs:` reach the calling workflow —
+        # including `grade`, which has nothing to do with fail-on. So
+        # `nyx audit --fail-on` exiting non-zero is captured into the
+        # `exceeded` output below instead, and it's up to the calling
+        # workflow to act on it (see README). Note GitHub runs `shell: bash`
+        # as `bash -e -o pipefail {0}` regardless of what's set here, so the
+        # `uv tool run | tee` pipeline below needs its own `|| true` to keep
+        # a non-zero `nyx` exit from killing the step outright.
         set -uo pipefail
 
         # Values above arrive via env: (not spliced into this script by
@@ -109,9 +111,16 @@ runs:
           args+=(--fail-on "$NYXOR_FAIL_ON")
         fi
 
+        # GitHub invokes `shell: bash` as `bash -e -o pipefail {0}` by
+        # default, regardless of any `set` in this script — so a non-zero
+        # exit from `nyx` here (expected and handled below via PIPESTATUS)
+        # would otherwise kill the whole step immediately, before any of
+        # the exceeded/grade handling below runs. `|| true` neutralizes
+        # that implicit `-e` for this one pipeline; PIPESTATUS still gives
+        # us the real exit code right after.
         uv tool run --python 3.13 \
           --from "nyxor @ git+https://github.com/ivnovomi/nyxor@${NYXOR_REF}" \
-          "${args[@]}" | tee nyxor-audit.log
+          "${args[@]}" | tee nyxor-audit.log || true
         audit_exit=${PIPESTATUS[0]}
 
         # Rich may wrap the "(grade X)" line across two lines in a narrow
