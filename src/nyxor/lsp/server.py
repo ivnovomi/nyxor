@@ -79,6 +79,10 @@ _BUILTIN_DOCS = {
     "max": "`max(list)` / `max(a, b, ...)` — largest value.",
     "sum": "`sum(list)` — total of a list of numbers.",
     "type_of": "`type_of(x)` — the runtime type name as a string.",
+    "now": "`now()` — the current time as Unix epoch seconds (a float).",
+    "to_iso8601": "`to_iso8601(epoch)` — formats epoch seconds as an ISO 8601 UTC string.",
+    "sha256": "`sha256(s)` — the SHA-256 hex digest of s.",
+    "md5": "`md5(s)` — the MD5 hex digest of s (fingerprinting/dedup, not password hashing).",
 }
 
 _UI_DOCS = {

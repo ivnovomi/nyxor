@@ -1,0 +1,18 @@
+# Hashing helpers for NyxScript — built on the sha256()/md5() builtins.
+# For fingerprinting, dedup keys, and change-detection, not for password
+# storage or anything actually security-sensitive.
+
+func short_hash(s, length):
+    "The first length characters of sha256(s) — a compact fingerprint."
+    return sha256(s)[:length]
+end
+
+func fingerprint(parts):
+    "A single sha256 hex digest over a list of values, order-sensitive."
+    return sha256(join(map(parts, lambda(p): str(p)), "|"))
+end
+
+func has_changed(previous_hash, current_value):
+    "True if sha256(current_value) differs from a previously recorded hash."
+    return previous_hash != sha256(current_value)
+end

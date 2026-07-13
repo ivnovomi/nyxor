@@ -1,0 +1,81 @@
+# A small, RFC 4180-ish CSV parser/writer for NyxScript — handles quoted
+# fields containing commas/newlines and doubled "" as an escaped quote.
+# No external dependency, since NyxScript scripts can't reach Python's csv
+# module without --unsafe.
+
+func parse_csv(text):
+    "Parses CSV text into a list of rows (each row a list of string fields)."
+    set rows = []
+    set row = []
+    set field = ""
+    set in_quotes = false
+    set i = 0
+    set n = len(text)
+
+    while i < n:
+        set ch = text[i]
+
+        if in_quotes:
+            if ch == "\"" and i + 1 < n and text[i + 1] == "\"":
+                set field = field + "\""
+                set i = i + 1
+            else:
+                if ch == "\"":
+                    set in_quotes = false
+                else:
+                    set field = field + ch
+                end
+            end
+        else:
+            if ch == "\"":
+                set in_quotes = true
+            else:
+                if ch == ",":
+                    set row = row + [field]
+                    set field = ""
+                else:
+                    if ch == "\n":
+                        set row = row + [field]
+                        set rows = rows + [row]
+                        set row = []
+                        set field = ""
+                    else:
+                        if ch != "\r":
+                            set field = field + ch
+                        end
+                    end
+                end
+            end
+        end
+
+        set i = i + 1
+    end
+
+    if len(field) > 0 or len(row) > 0:
+        set row = row + [field]
+        set rows = rows + [row]
+    end
+
+    return rows
+end
+
+func _needs_quoting(field):
+    return contains(field, ",") or contains(field, "\"") or contains(field, "\n")
+end
+
+func _quote_field(field):
+    if _needs_quoting(field):
+        return "\"" + replace(field, "\"", "\"\"") + "\""
+    end
+    return field
+end
+
+func to_csv(rows):
+    "Formats a list of rows (each a list of values) as CSV text, quoting fields that need it."
+    set lines = []
+    foreach row in rows:
+        set quoted = map(row, lambda(v): _quote_field(str(v)))
+        set lines = lines + [join(quoted, ",")]
+    end
+    return join(lines, "\n")
+end

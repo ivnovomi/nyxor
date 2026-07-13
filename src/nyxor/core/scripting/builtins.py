@@ -10,6 +10,7 @@ useful `lib/time.nyx` without it.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from collections.abc import Callable
@@ -290,6 +291,21 @@ def _to_iso8601(args: list[Any]) -> str:
         raise ValueError(f"to_iso8601(): invalid timestamp — {exc}") from exc
 
 
+def _sha256(args: list[Any]) -> str:
+    if len(args) != 1:
+        raise _arity_error("sha256", "1 argument", len(args))
+    return hashlib.sha256(str(args[0]).encode("utf-8")).hexdigest()
+
+
+def _md5(args: list[Any]) -> str:
+    # For fingerprinting/dedup keys, not password/security-sensitive
+    # hashing — NyxScript has no auth system for md5's collision
+    # weaknesses to matter against.
+    if len(args) != 1:
+        raise _arity_error("md5", "1 argument", len(args))
+    return hashlib.md5(str(args[0]).encode("utf-8")).hexdigest()
+
+
 BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "len": _len,
     "range": _range,
@@ -323,4 +339,6 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "to_json": _to_json,
     "now": _now,
     "to_iso8601": _to_iso8601,
+    "sha256": _sha256,
+    "md5": _md5,
 }
