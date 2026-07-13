@@ -1,0 +1,97 @@
+# Target-string and IPv4 helpers for NyxScript automation — pure string/int
+# parsing, no actual network I/O (that's what `run dns`/`run tls`/`run http`
+# are for). Handy for filtering/labeling a target list before scanning it.
+
+import "lib/validate.nyx" as validate
+
+func host_from_target(raw):
+    "Pulls a bare hostname/IP out of a domain, host:port, or scheme://host/path string."
+    set s = raw
+
+    set scheme_end = find(s, "://")
+    if scheme_end >= 0:
+        set s = s[scheme_end + 3:]
+    end
+
+    set path_start = find(s, "/")
+    if path_start >= 0:
+        set s = s[:path_start]
+    end
+
+    if starts_with(s, "["):
+        set close = find(s, "]")
+        if close >= 0:
+            return s[1:close]
+        end
+    end
+
+    set colon_count = count_char(s, ":")
+    if colon_count == 1:
+        return split(s, ":")[0]
+    end
+
+    return s
+end
+
+func port_from_target(raw, default_port):
+    "Parses the port out of a host:port string, or returns default_port if absent/invalid."
+    set idx = find(raw, ":")
+    if idx < 0:
+        return default_port
+    end
+    set candidate = raw[idx + 1:]
+    if validate.is_valid_port(candidate):
+        return int(candidate)
+    end
+    return default_port
+end
+
+func count_char(s, ch):
+    "Counts occurrences of the single character ch in s."
+    set n = 0
+    set i = 0
+    while i < len(s):
+        if s[i] == ch:
+            set n = n + 1
+        end
+        set i = i + 1
+    end
+    return n
+end
+
+func octets(s):
+    "Parses a dotted-quad IPv4 string into a list of 4 ints. Assumes s already passed validate.is_valid_ipv4."
+    set parts = split(s, ".")
+    set out = []
+    foreach p in parts:
+        set out = out + [int(p)]
+    end
+    return out
+end
+
+func is_private_ipv4(s):
+    "True if s is a private, loopback, or link-local IPv4 address (RFC 1918 + friends)."
+    if not validate.is_valid_ipv4(s):
+        return false
+    end
+    set o = octets(s)
+    set a = o[0]
+    set b = o[1]
+
+    if a == 10:
+        return true
+    end
+    if a == 127:
+        return true
+    end
+    if a == 169 and b == 254:
+        return true
+    end
+    if a == 172 and b >= 16 and b <= 31:
+        return true
+    end
+    if a == 192 and b == 168:
+        return true
+    end
+    return false
+end

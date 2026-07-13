@@ -29,3 +29,52 @@ func chunk(items, size):
 
     return out
 end
+
+func flatten(nested):
+    "Concatenates a list of lists into a single list, one level deep."
+    set out = []
+    foreach inner in nested:
+        set out = out + inner
+    end
+    return out
+end
+
+func partition(items, pred):
+    "Splits items into [matching, non_matching] by pred(item)."
+    set matching = []
+    set non_matching = []
+
+    foreach item in items:
+        if pred(item):
+            set matching = matching + [item]
+        else:
+            set non_matching = non_matching + [item]
+        end
+    end
+    return [matching, non_matching]
+end
+
+func take(items, n):
+    "The first n items (or fewer, if items is shorter)."
+    if n >= len(items):
+        return items
+    end
+    return items[:n]
+end
+
+func drop(items, n):
+    "items with the first n items removed (or [] if n >= len(items))."
+    if n >= len(items):
+        return []
+    end
+    return items[n:]
+end
+
+func sum_by(items, fn):
+    "Sum of fn(item) across items — like reduce(items, lambda(acc, x): acc + fn(x), 0)."
+    set total = 0
+    foreach item in items:
+        set total = total + fn(item)
+    end
+    return total
+end

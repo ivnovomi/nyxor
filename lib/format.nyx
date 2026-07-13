@@ -1,0 +1,53 @@
+# Human-readable formatting helpers for NyxScript output.
+
+func pad_left(s, width, ch):
+    "Left-pads s with ch until it's at least width characters long."
+    set out = s
+    while len(out) < width:
+        set out = ch + out
+    end
+    return out
+end
+
+func pad_right(s, width, ch):
+    "Right-pads s with ch until it's at least width characters long."
+    set out = s
+    while len(out) < width:
+        set out = out + ch
+    end
+    return out
+end
+
+func human_bytes(n):
+    "Formats a byte count as e.g. \"1.5 KB\", \"3.0 MB\"."
+    set units = ["B", "KB", "MB", "GB", "TB"]
+    set value = n
+    set i = 0
+    while value >= 1024 and i < len(units) - 1:
+        set value = value / 1024
+        set i = i + 1
+    end
+    return str(round(value, 1)) + " " + units[i]
+end
+
+func human_duration(total_seconds):
+    "Formats a second count as e.g. \"1h 2m 3s\", dropping zero leading units."
+    set s = int(total_seconds)
+    set hours = int(s / 3600)
+    set minutes = int((s - hours * 3600) / 60)
+    set seconds = s - hours * 3600 - minutes * 60
+
+    if hours > 0:
+        return str(hours) + "h " + str(minutes) + "m " + str(seconds) + "s"
+    end
+    if minutes > 0:
+        return str(minutes) + "m " + str(seconds) + "s"
+    end
+    return str(seconds) + "s"
+end
+
+func bullet_list(items):
+    "Joins items into a newline-separated, \"- \"-prefixed list."
+    set lines = map(items, lambda(item): "- " + str(item))
+    return join(lines, "\n")
+end

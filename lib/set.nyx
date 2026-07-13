@@ -1,0 +1,61 @@
+# Set operations for NyxScript — lists as unordered, deduplicated
+# collections. Order in the output follows first-seen order in the inputs,
+# not sorted, since NyxScript has no hashable-set type to rely on.
+
+func union(a, b):
+    "All items from either a or b, deduplicated."
+    set out = []
+    foreach item in a + b:
+        if not contains(out, item):
+            set out = out + [item]
+        end
+    end
+    return out
+end
+
+func intersect(a, b):
+    "Items present in both a and b, deduplicated."
+    set out = []
+    foreach item in a:
+        if contains(b, item) and not contains(out, item):
+            set out = out + [item]
+        end
+    end
+    return out
+end
+
+func difference(a, b):
+    "Items in a that are not in b, deduplicated."
+    set out = []
+    foreach item in a:
+        if not contains(b, item) and not contains(out, item):
+            set out = out + [item]
+        end
+    end
+    return out
+end
+
+func symmetric_difference(a, b):
+    "Items in exactly one of a or b."
+    return difference(a, b) + difference(b, a)
+end
+
+func is_subset(a, b):
+    "True if every item in a is also in b."
+    foreach item in a:
+        if not contains(b, item):
+            return false
+        end
+    end
+    return true
+end
+
+func is_disjoint(a, b):
+    "True if a and b share no items."
+    foreach item in a:
+        if contains(b, item):
+            return false
+        end
+    end
+    return true
+end
