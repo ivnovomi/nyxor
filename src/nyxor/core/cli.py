@@ -15,7 +15,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from nyxor.core.banner import print_banner
+from nyxor.core.banner import boot_sequence
 from nyxor.core.config import load_config
 from nyxor.core.context import NyxorContext, OutputOptions
 from nyxor.core.errors import NyxorError
@@ -114,7 +114,7 @@ def main_callback(
     )
 
     if ctx.invoked_subcommand is None:
-        print_banner(ctx.obj.console)
+        boot_sequence(ctx.obj.console)
         ctx.obj.console.print(ctx.get_help(), markup=False, highlight=False)
         raise typer.Exit()
 

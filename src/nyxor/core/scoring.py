@@ -46,6 +46,9 @@ GRADE_COLOR: dict[str, str] = {
 }
 
 
+_SEVERITY_ORDER = list(Severity)
+
+
 @dataclass(frozen=True)
 class SecurityScore:
     points: int
@@ -55,6 +58,27 @@ class SecurityScore:
     @property
     def color(self) -> str:
         return GRADE_COLOR[self.grade]
+
+    @property
+    def worst_severity(self) -> Severity | None:
+        """The single worst severity with at least one finding, or ``None``
+
+        if there are no findings at all.
+        """
+        for severity in reversed(_SEVERITY_ORDER):
+            if self.finding_counts.get(severity, 0) > 0:
+                return severity
+        return None
+
+    def meets_or_exceeds(self, threshold: Severity) -> bool:
+        """True if the worst finding is at least as severe as ``threshold``
+
+        (e.g. for a ``--fail-on high`` CI gate).
+        """
+        worst = self.worst_severity
+        if worst is None:
+            return False
+        return _SEVERITY_ORDER.index(worst) >= _SEVERITY_ORDER.index(threshold)
 
 
 def score_results(results: list[ModuleResult]) -> SecurityScore:

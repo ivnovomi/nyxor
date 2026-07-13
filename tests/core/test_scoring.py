@@ -51,3 +51,33 @@ def test_render_badge_embeds_label_and_grade() -> None:
     assert "example.com" in svg
     assert f">{score.grade}<" in svg
     assert score.color in svg
+
+
+def test_worst_severity_is_none_with_no_findings() -> None:
+    score = score_results([_result_with()])
+    assert score.worst_severity is None
+
+
+def test_worst_severity_picks_the_single_worst_across_multiple_findings() -> None:
+    score = score_results([_result_with(Severity.LOW, Severity.HIGH, Severity.INFO)])
+    assert score.worst_severity == Severity.HIGH
+
+
+def test_meets_or_exceeds_true_when_worst_finding_matches_threshold_exactly() -> None:
+    score = score_results([_result_with(Severity.MEDIUM)])
+    assert score.meets_or_exceeds(Severity.MEDIUM) is True
+
+
+def test_meets_or_exceeds_true_when_worst_finding_is_more_severe() -> None:
+    score = score_results([_result_with(Severity.CRITICAL)])
+    assert score.meets_or_exceeds(Severity.MEDIUM) is True
+
+
+def test_meets_or_exceeds_false_when_worst_finding_is_less_severe() -> None:
+    score = score_results([_result_with(Severity.LOW)])
+    assert score.meets_or_exceeds(Severity.HIGH) is False
+
+
+def test_meets_or_exceeds_false_with_no_findings_at_all() -> None:
+    score = score_results([_result_with()])
+    assert score.meets_or_exceeds(Severity.INFO) is False

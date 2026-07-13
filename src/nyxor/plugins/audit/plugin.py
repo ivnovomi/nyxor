@@ -175,6 +175,11 @@ def _audit(
         "--no-local",
         help="Skip the local model for --dumber/--fix-suggestions (templates/skip instead).",
     ),
+    fail_on: Severity | None = typer.Option(
+        None,
+        "--fail-on",
+        help="Exit with code 1 if any finding is at least this severity — for CI gates.",
+    ),
 ) -> None:
     """Run a combined DNS + TLS + HTTP audit against a domain."""
     context: NyxorContext = ctx.obj
@@ -197,6 +202,13 @@ def _audit(
         if fix_suggestions_flag:
             asyncio.run(_print_fix_suggestions(context, results, no_local=no_local))
     emit_results(context, results, title=f"NYXOR Audit — {domain}")
+
+    if fail_on is not None and score_results(results).meets_or_exceeds(fail_on):
+        context.console.print(
+            f"[bold red]--fail-on {fail_on.value}:[/bold red] "
+            f"at least one {fail_on.value}-or-worse finding was found."
+        )
+        raise typer.Exit(code=1)
 
 
 class AuditPlugin:
