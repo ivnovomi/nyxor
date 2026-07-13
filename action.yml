@@ -115,18 +115,21 @@ runs:
         # default, regardless of any `set` in this script — so a non-zero
         # exit from `nyx` here (expected and handled below via PIPESTATUS)
         # would otherwise kill the whole step immediately, before any of
-        # the exceeded/grade handling below runs. `|| true` neutralizes
-        # that implicit `-e` for this one pipeline; PIPESTATUS still gives
-        # us the real exit code right after.
+        # the exceeded/grade handling below runs. `set +e` around just this
+        # pipeline neutralizes that implicit `-e`; unlike `| tee ... || true`,
+        # it doesn't run a second command afterward that would reset
+        # PIPESTATUS back to a single successful exit code.
+        set +e
         uv tool run --python 3.13 \
           --from "nyxor @ git+https://github.com/ivnovomi/nyxor@${NYXOR_REF}" \
-          "${args[@]}" | tee nyxor-audit.log || true
+          "${args[@]}" | tee nyxor-audit.log
         audit_exit=${PIPESTATUS[0]}
+        set -e
 
-        # Rich may wrap the "(grade X)" line across two lines in a narrow
-        # terminal — join everything before matching so the grade is found
-        # regardless of wrapping.
-        grade=$(tr '\n' ' ' < nyxor-audit.log | grep -oP '(?<=grade )[A-Za-z+-]+(?=\))' | tail -1 || true)
+        # nyx prints the grade as "... grade B+ ..." (no surrounding
+        # parens); Rich may wrap it across two lines in a narrow terminal,
+        # so join everything before matching.
+        grade=$(tr '\n' ' ' < nyxor-audit.log | grep -oP '(?<=grade )[A-Za-z+-]+' | tail -1 || true)
         if [ -z "$grade" ]; then
           echo "::warning::Could not parse a grade from nyx audit's output."
           grade="unknown"
