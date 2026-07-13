@@ -27,6 +27,8 @@ reimplemented twice — fix a bug once, it's fixed everywhere. See
   types, control flow, functions, imports, error handling.
 - **[NyxScript Standard Library Reference](NyxScript-Standard-Library-Reference)**
   — every builtin function and every `lib/*.nyx` module, with signatures.
+- **[NyxScript Cookbook](NyxScript-Cookbook)** — runnable, verified
+  scripts combining several stdlib modules for real workflows.
 
 ## Other front-ends
 
@@ -49,6 +51,8 @@ reimplemented twice — fix a bug once, it's fixed everywhere. See
   this project is built (AI-assisted, transparently).
 - **[FAQ / Troubleshooting](FAQ-Troubleshooting)** — common `nyx doctor`
   failures, local-AI setup, config file locations.
+- **[Glossary](Glossary)** — every term (`ModuleResult`, `Finding`,
+  `Asset`, `Severity`, ...) defined in one place.
 - **[Contributing](Contributing)** — how to propose changes, cut a
   release.
 
