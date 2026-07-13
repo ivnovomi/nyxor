@@ -83,6 +83,10 @@ _BUILTIN_DOCS = {
     "to_iso8601": "`to_iso8601(epoch)` — formats epoch seconds as an ISO 8601 UTC string.",
     "sha256": "`sha256(s)` — the SHA-256 hex digest of s.",
     "md5": "`md5(s)` — the MD5 hex digest of s (fingerprinting/dedup, not password hashing).",
+    "regex_match": "`regex_match(text, pattern)` — true if pattern matches anywhere in text.",
+    "regex_find": "`regex_find(text, pattern, default)` — first match, or default if none.",
+    "regex_find_all": "`regex_find_all(text, pattern)` — every match as a list.",
+    "regex_replace": "`regex_replace(text, pattern, replacement)` — substitutes every match.",
 }
 
 _UI_DOCS = {

@@ -111,7 +111,14 @@ def tokenize(source: str, start_line: int = 1) -> list[Token]:
                     break
                 if c == "\\" and i + 1 < n:
                     nxt = source[i + 1]
-                    chars.append(_ESCAPES.get(nxt, nxt))
+                    # An unrecognized escape (not in _ESCAPES) keeps *both*
+                    # characters — "\w" stays "\w", matching Python's own
+                    # behavior for an unknown escape in a string literal.
+                    # Silently dropping the backslash (the old behavior)
+                    # made regex patterns like "\d+"/"\w+" unwritable: the
+                    # backslash the pattern actually needs would vanish
+                    # before the regex engine ever saw it.
+                    chars.append(_ESCAPES.get(nxt, "\\" + nxt))
                     i += 2
                     continue
                 if c == quote:

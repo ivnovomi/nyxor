@@ -5,13 +5,20 @@ over NyxScript's own value types (str, int, float, bool, list) — no I/O, so
 unlike `run`/`ui.*` these never need to be awaited by the interpreter.
 `now()` is the one exception: it's synchronous and does no I/O either, but
 it's non-deterministic (reads the wall clock) — there's no way to write a
-useful `lib/time.nyx` without it.
+useful `lib/time.nyx` without it. The regex_* functions are the other
+exception: they run in a separate worker *process* with a wall-clock
+timeout rather than directly — see `_run_regex_op` for why a thread isn't
+enough to protect against a catastrophic-backtracking pattern.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import multiprocessing as mp
+import re
+import threading
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -291,6 +298,173 @@ def _to_iso8601(args: list[Any]) -> str:
         raise ValueError(f"to_iso8601(): invalid timestamp — {exc}") from exc
 
 
+_REGEX_TIMEOUT_SECONDS = 1.0
+_REGEX_MAX_INPUT_LEN = 100_000
+
+# `spawn` (not `fork`) so this behaves identically on Windows, where it's
+# the only option anyway — no point in the two platforms having different
+# regex-timeout behavior.
+_REGEX_MP_CONTEXT = mp.get_context("spawn")
+
+# A single, lazily-started, long-lived worker process, reused across every
+# regex_* call in this interpreter's lifetime — see `_run_regex_op` for why
+# a *process* is needed at all, and why it's one persistent worker rather
+# than a fresh spawn per call (spawning a whole interpreter, especially on
+# Windows, costs tens to hundreds of milliseconds; doing that on every
+# `regex_match()` inside a loop would make the language painfully slow).
+_regex_lock = threading.Lock()
+_regex_process: mp.process.BaseProcess | None = None
+_regex_conn: Any = None
+
+
+def _compile_regex(pattern: str) -> re.Pattern[str]:
+    try:
+        return re.compile(pattern)
+    except re.error as exc:
+        raise ValueError(f"invalid regex {pattern!r}: {exc}") from exc
+
+
+def _check_regex_input_len(text: str) -> None:
+    if len(text) > _REGEX_MAX_INPUT_LEN:
+        raise ValueError(
+            f"regex input is {len(text):,} characters (limit {_REGEX_MAX_INPUT_LEN:,})"
+        )
+
+
+def _regex_worker_loop(conn: Any) -> None:
+    """The persistent worker process's main loop — a plain module-level
+
+    function so `multiprocessing`'s `spawn` start method can pickle a
+    reference to it. Handles one `(op, pattern, text, replacement)` request
+    at a time for as long as the parent process keeps it alive.
+    """
+    while True:
+        try:
+            op, pattern, text, replacement = conn.recv()
+        except EOFError:
+            return
+        try:
+            compiled = re.compile(pattern)
+            value: Any
+            if op == "match":
+                value = bool(compiled.search(text))
+            elif op == "find":
+                found = compiled.search(text)
+                value = found.group(0) if found else None
+            elif op == "find_all":
+                # findall() returns tuples for patterns with capture groups
+                # — NyxScript has no tuple type, only list, so normalize.
+                value = [
+                    list(r) if isinstance(r, tuple) else r for r in compiled.findall(text)
+                ]
+            else:
+                value = compiled.sub(replacement, text)
+            conn.send(("ok", value))
+        except Exception as exc:  # noqa: BLE001 - reported back to the caller, not swallowed
+            conn.send(("error", str(exc)))
+
+
+def _kill_regex_worker() -> None:
+    """Terminate (or hard-kill) the current worker and clear it, so the
+
+    next call spawns a fresh one instead of queueing behind whatever this
+    one is still stuck doing.
+    """
+    global _regex_process, _regex_conn
+    process, _regex_process = _regex_process, None
+    conn, _regex_conn = _regex_conn, None
+    if conn is not None:
+        with contextlib.suppress(OSError):
+            conn.close()
+    if process is not None and process.is_alive():
+        process.terminate()
+        process.join(timeout=1.0)
+        if process.is_alive():
+            process.kill()
+
+
+def _ensure_regex_worker() -> Any:
+    global _regex_process, _regex_conn
+    if _regex_process is not None and _regex_process.is_alive() and _regex_conn is not None:
+        return _regex_conn
+    parent_conn, child_conn = _REGEX_MP_CONTEXT.Pipe()
+    process = _REGEX_MP_CONTEXT.Process(target=_regex_worker_loop, args=(child_conn,), daemon=True)
+    process.start()
+    child_conn.close()  # only the child should hold the writable end
+    _regex_process = process
+    _regex_conn = parent_conn
+    return parent_conn
+
+
+def _run_regex_op(op: str, pattern: str, text: str, replacement: str = "") -> Any:
+    """Runs a regex operation in the persistent worker process, with a hard
+
+    wall-clock timeout.
+
+    Why a *process*, not a thread: CPython's `re` engine never releases the
+    GIL mid-match, so a catastrophic-backtracking pattern (e.g. `(a+)+b`
+    against a long non-matching input) holds the GIL for its entire —
+    effectively unbounded — run. A watchdog *thread* waiting on
+    `Thread.join(timeout=…)` can't get scheduled to even notice the
+    deadline passed, since noticing it also needs the GIL that the runaway
+    match is holding. A separate process has its own GIL, so unlike a
+    thread it can actually be killed outright when it overruns.
+    """
+    _check_regex_input_len(text)
+    _compile_regex(pattern)  # fail fast on a bad pattern before bothering the worker
+
+    with _regex_lock:
+        try:
+            conn = _ensure_regex_worker()
+            conn.send((op, pattern, text, replacement))
+            if conn.poll(_REGEX_TIMEOUT_SECONDS):
+                status, payload = conn.recv()
+            else:
+                _kill_regex_worker()
+                raise ValueError(
+                    f"regex evaluation exceeded {_REGEX_TIMEOUT_SECONDS}s — likely "
+                    "catastrophic backtracking in the pattern"
+                )
+        except (BrokenPipeError, EOFError, OSError, RuntimeError) as exc:
+            _kill_regex_worker()
+            raise ValueError(f"regex worker process is unavailable: {exc}") from exc
+
+    if status == "error":
+        raise ValueError(payload)
+    return payload
+
+
+def _regex_match(args: list[Any]) -> bool:
+    if len(args) != 2:
+        raise _arity_error("regex_match", "2 arguments (text, pattern)", len(args))
+    text, pattern = str(args[0]), str(args[1])
+    return bool(_run_regex_op("match", pattern, text))
+
+
+def _regex_find(args: list[Any]) -> Any:
+    # No null in NyxScript, so — like get() — the "not found" value is a
+    # mandatory default rather than something implicit.
+    if len(args) != 3:
+        raise _arity_error("regex_find", "3 arguments (text, pattern, default)", len(args))
+    text, pattern, default = str(args[0]), str(args[1]), args[2]
+    result = _run_regex_op("find", pattern, text)
+    return result if result is not None else default
+
+
+def _regex_find_all(args: list[Any]) -> list[Any]:
+    if len(args) != 2:
+        raise _arity_error("regex_find_all", "2 arguments (text, pattern)", len(args))
+    text, pattern = str(args[0]), str(args[1])
+    return list(_run_regex_op("find_all", pattern, text))
+
+
+def _regex_replace(args: list[Any]) -> str:
+    if len(args) != 3:
+        raise _arity_error("regex_replace", "3 arguments (text, pattern, replacement)", len(args))
+    text, pattern, replacement = str(args[0]), str(args[1]), str(args[2])
+    return str(_run_regex_op("replace", pattern, text, replacement))
+
+
 def _sha256(args: list[Any]) -> str:
     if len(args) != 1:
         raise _arity_error("sha256", "1 argument", len(args))
@@ -341,4 +515,8 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "to_iso8601": _to_iso8601,
     "sha256": _sha256,
     "md5": _md5,
+    "regex_match": _regex_match,
+    "regex_find": _regex_find,
+    "regex_find_all": _regex_find_all,
+    "regex_replace": _regex_replace,
 }
