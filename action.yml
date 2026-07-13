@@ -41,10 +41,13 @@ inputs:
     default: "true"
   fail-on:
     description: >-
-      Fail this action if any finding is at least this severity
-      (critical, high, medium, low, or info). Leave empty (the default) to
-      never fail based on findings — reports/badges/PR comments still get
-      written either way; this only controls the final job result.
+      Severity to gate on (critical, high, medium, low, or info). Leave
+      empty (the default) to skip the check entirely. This action never
+      fails itself over findings — a composite action failing partway
+      loses its own outputs, which would take `grade` down with it. Check
+      the `exceeded-fail-on` output in your own workflow instead (see the
+      README for the one-line pattern); reports/badges/PR comments get
+      written either way regardless of what you do with it.
     required: false
     default: ""
 
@@ -55,7 +58,7 @@ outputs:
   exceeded-fail-on:
     description: >-
       "true" if `fail-on` was set and a finding met or exceeded it,
-      "false" otherwise.
+      "false" otherwise (including when `fail-on` was left empty).
     value: ${{ steps.audit.outputs.exceeded }}
 
 runs:
@@ -76,10 +79,14 @@ runs:
         NYXOR_REF: ${{ inputs.nyxor-ref }}
         NYXOR_FAIL_ON: ${{ inputs.fail-on }}
       run: |
-        # No `-e`: `nyx audit --fail-on` exiting non-zero is an expected,
-        # meaningful outcome here, not a script bug — it needs to be
-        # captured and acted on below (after the report/summary/PR-comment
-        # steps still run), not let `set -e` kill this step mid-way through.
+        # No `-e`, and this step (and this whole composite action) never
+        # exits non-zero over `--fail-on` on purpose: if a composite
+        # action step fails, none of its declared `outputs:` reach the
+        # calling workflow — including `grade`, which has nothing to do
+        # with fail-on. So `nyx audit --fail-on` exiting non-zero is
+        # captured into the `exceeded` output below instead, and it's up
+        # to the calling workflow to act on it (see README) — that keeps
+        # `grade` reliable regardless of whether fail-on tripped.
         set -uo pipefail
 
         # Values above arrive via env: (not spliced into this script by
@@ -148,12 +155,3 @@ runs:
         <sub>via [nyxor](https://github.com/ivnovomi/nyxor)</sub>"
 
         gh pr comment "$PR_NUMBER" --repo "$REPO" --body "$body"
-
-    - name: Enforce fail-on
-      if: inputs.fail-on != '' && steps.audit.outputs.exceeded == 'true'
-      shell: bash
-      env:
-        NYXOR_FAIL_ON: ${{ inputs.fail-on }}
-      run: |
-        echo "::error::--fail-on ${NYXOR_FAIL_ON}: at least one ${NYXOR_FAIL_ON}-or-worse finding was found."
-        exit 1

@@ -315,17 +315,29 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: ivnovomi/nyxor@v1
+      - id: nyxor
+        uses: ivnovomi/nyxor@v1
         with:
           target: example.com
           badge-path: nyxor-badge.svg
+          fail-on: high   # optional — see below
+
+      # Only needed if you set fail-on above. A composite action step
+      # failing loses its own outputs, so the action itself never fails —
+      # it just tells you whether the threshold was hit and leaves the
+      # decision (and when it happens, relative to any steps after this
+      # one) to you.
+      - if: steps.nyxor.outputs.exceeded-fail-on == 'true'
+        run: exit 1
 ```
 
-Outputs a `grade` (`A+` down to `F`) you can gate on, writes an HTML
+Outputs a `grade` (`A+` down to `F`) and, if `fail-on` was set, an
+`exceeded-fail-on` (`"true"`/`"false"`) you can gate on. Writes an HTML
 report and an SVG badge as build artifacts, drops a summary into the
 job's Actions tab, and — on a `pull_request` event, if the calling
 workflow grants `pull-requests: write` — posts the grade as a PR comment
-automatically (`pr-comment: "false"` to opt out).
+automatically (`pr-comment: "false"` to opt out). All of that happens
+regardless of `fail-on` — it never blocks the report/badge/comment steps.
 
 Point `report-path` at a `.sarif` file instead of `.html` and feed it
 straight to GitHub's own uploader — findings show up as native alerts in
