@@ -1,14 +1,19 @@
 """Pure built-in functions callable from any NyxScript expression.
 
-Everything here is a plain, synchronous, side-effect-free function over
-NyxScript's own value types (str, int, float, bool, list) — no I/O, so
+Almost everything here is a plain, synchronous, side-effect-free function
+over NyxScript's own value types (str, int, float, bool, list) — no I/O, so
 unlike `run`/`ui.*` these never need to be awaited by the interpreter.
+`now()` is the one exception: it's synchronous and does no I/O either, but
+it's non-deterministic (reads the wall clock) — there's no way to write a
+useful `lib/time.nyx` without it.
 """
 
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 BuiltinFn = Callable[[list[Any]], Any]
@@ -270,6 +275,21 @@ def _to_json(args: list[Any]) -> str:
         raise TypeError(f"to_json(): {exc}") from exc
 
 
+def _now(args: list[Any]) -> float:
+    if args:
+        raise _arity_error("now", "no arguments", len(args))
+    return time.time()
+
+
+def _to_iso8601(args: list[Any]) -> str:
+    if len(args) != 1:
+        raise _arity_error("to_iso8601", "1 argument (epoch seconds)", len(args))
+    try:
+        return datetime.fromtimestamp(float(args[0]), tz=UTC).isoformat()
+    except (OverflowError, OSError, ValueError) as exc:
+        raise ValueError(f"to_iso8601(): invalid timestamp — {exc}") from exc
+
+
 BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "len": _len,
     "range": _range,
@@ -301,4 +321,6 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "zip": _zip,
     "parse_json": _parse_json,
     "to_json": _to_json,
+    "now": _now,
+    "to_iso8601": _to_iso8601,
 }

@@ -1,0 +1,90 @@
+# Helpers over Asset lists — the `.assets` a module like `network.discover`
+# attaches to its ModuleResult. `kind`/`identifier`/`attributes` are always
+# set; `source_module` can be Python's None (NyxScript has no null of its
+# own), so it's handled defensively via type_of() rather than accessed
+# directly.
+
+func by_kind(assets, kind):
+    "Only the assets whose .kind equals kind."
+    set out = []
+    foreach a in assets:
+        if a.kind == kind:
+            set out = out + [a]
+        end
+    end
+    return out
+end
+
+func kinds(assets):
+    "The distinct .kind values present, in first-seen order."
+    set out = []
+    foreach a in assets:
+        if not contains(out, a.kind):
+            set out = out + [a.kind]
+        end
+    end
+    return out
+end
+
+func identifiers(assets):
+    "The .identifier of every asset, in order (may contain duplicates)."
+    set out = []
+    foreach a in assets:
+        set out = out + [a.identifier]
+    end
+    return out
+end
+
+func count_by_kind(assets):
+    "A dict of kind -> count."
+    set out = {}
+    foreach a in assets:
+        if contains(keys(out), a.kind):
+            set out[a.kind] = out[a.kind] + 1
+        else:
+            set out[a.kind] = 1
+        end
+    end
+    return out
+end
+
+func group_by_kind(assets):
+    "A dict of kind -> [asset, ...]."
+    set out = {}
+    foreach a in assets:
+        if contains(keys(out), a.kind):
+            set out[a.kind] = out[a.kind] + [a]
+        else:
+            set out[a.kind] = [a]
+        end
+    end
+    return out
+end
+
+func attr(a, key, default):
+    "a.attributes[key], or default if the key isn't present."
+    return get(a.attributes, key, default)
+end
+
+func has_attr(a, key):
+    "True if key is present in a.attributes."
+    return contains(keys(a.attributes), key)
+end
+
+func has_source(a):
+    "True if a.source_module is set (it's Python None, not a NyxScript value, when it isn't)."
+    return type_of(a.source_module) != "NoneType"
+end
+
+func source_or(a, default):
+    "a.source_module, or default if it isn't set."
+    if has_source(a):
+        return a.source_module
+    end
+    return default
+end
+
+func summary_line(a):
+    "A one-line \"kind: identifier\" description of a."
+    return a.kind + ": " + a.identifier
+end

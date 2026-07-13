@@ -1,0 +1,43 @@
+# Time helpers for NyxScript — built on the `now()`/`to_iso8601()`
+# builtins (epoch seconds as a float; NyxScript has no native datetime
+# type, so timestamps are just numbers you can do arithmetic on).
+
+import "lib/format.nyx" as format
+
+func elapsed(start):
+    "Seconds since the epoch timestamp start (e.g. from an earlier now())."
+    return now() - start
+end
+
+func is_older_than(start, max_age_seconds):
+    "True if start is more than max_age_seconds in the past."
+    return elapsed(start) > max_age_seconds
+end
+
+func humanize(seconds):
+    "Formats a second count as e.g. \"1h 2m 3s\" — see lib/format.nyx."
+    return format.human_duration(seconds)
+end
+
+func now_iso():
+    "The current time as an ISO 8601 UTC string."
+    return to_iso8601(now())
+end
+
+func backoff_delay(attempt, base_seconds):
+    "Exponential backoff: base_seconds * 2^attempt (attempt 0 => base_seconds)."
+    set delay = base_seconds
+    set i = 0
+    while i < attempt:
+        set delay = delay * 2
+        set i = i + 1
+    end
+    return delay
+end
+
+func time_it(fn):
+    "Calls fn() and returns [result, elapsed_seconds]."
+    set start = now()
+    set result = fn()
+    return [result, elapsed(start)]
+end
