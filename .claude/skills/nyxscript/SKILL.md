@@ -206,6 +206,16 @@ bytes type, so binary data is a list of ints 0-255: `bytes_from_hex(s)`,
 `unpack_uint16(list)`/`unpack_uint32(list)` (→ int). Use these to build/
 parse messages for `socket.*` below.
 
+**Raw packet builders** (also pure, no `--unsafe`) — `checksum(list)`
+(RFC 1071 Internet checksum), `build_ip_header(src_ip, dst_ip, protocol,
+payload[, ttl][, id][, dont_fragment])`, `build_tcp_header(src_ip,
+dst_ip, src_port, dst_port, seq, ack, flags, payload[, window])` (flags:
+int bitmask or `"SYN,ACK"`-style string), `build_udp_header(src_ip,
+dst_ip, src_port, dst_port, payload)`, `build_icmp_echo(identifier,
+sequence, payload[, is_reply])` — all checksums filled in correctly to
+spec. Only *sending* the result needs `--unsafe` (`socket.raw_send`,
+below).
+
 **Regex builtins** — `regex_match(text, pattern)`,
 `regex_find(text, pattern, default)`, `regex_find_all(text, pattern)`,
 `regex_replace(text, pattern, replacement)`. Run in a sandboxed worker
@@ -298,6 +308,18 @@ values, `socket.recv_text(...)` → UTF-8 string, `socket.close(handle)`.
 Every blocking call has an explicit timeout; a one-shot run (`nyx
 script run`, the TUI's Run button) auto-closes connections a script
 left open.
+
+`socket.raw_send(dst_ip, packet[, timeout])` sends one complete IP
+packet (own header included, from `build_ip_header`) via `IP_HDRINCL` —
+needs root on Linux/macOS; **refused outright by Windows even as
+administrator**, confirmed empirically (not just documented) during
+development. `socket.raw_recv(interface_ip[, timeout])` → handle (opens
+a raw capture socket; flips on `SIO_RCVALL` on Windows), `socket.raw_read
+(handle[, max_bytes][, timeout])` → list of byte values (one captured IP
+packet, header included), `socket.close(handle)` also closes a
+`raw_recv` handle. `socket.raw_recv` only sees traffic addressed to the
+given interface unless the OS/NIC is separately in promiscuous mode —
+NyxScript never flips that itself.
 
 A script can also self-enable all three with a bare `unsafe` statement
 (typically the first line), instead of the caller passing `--unsafe`:

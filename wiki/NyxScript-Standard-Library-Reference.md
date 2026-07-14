@@ -89,6 +89,32 @@ print pack_uint16(4660)                      # [18, 52]
 print unpack_uint16([18, 52])                # 4660
 ```
 
+### Raw packet builders
+
+Also pure and always available (no `--unsafe`) — these only construct
+bytes in memory, per RFC 791 (IPv4), RFC 793 (TCP), RFC 768 (UDP), and
+RFC 792 (ICMP echo), checksums included. Only *sending* the result over
+the network (`socket.raw_send`, below) needs `--unsafe`.
+
+| Function | Signature | Description |
+|---|---|---|
+| `checksum` | `(list)` | The Internet checksum (RFC 1071) of a list of byte values |
+| `build_ip_header` | `(src_ip, dst_ip, protocol, payload[, ttl][, id][, dont_fragment])` | A 20-byte IPv4 header (no options), checksum filled in |
+| `build_tcp_header` | `(src_ip, dst_ip, src_port, dst_port, seq, ack, flags, payload[, window])` | A 20-byte TCP header, checksum filled in via the pseudo-header; `flags` is an int bitmask or a string like `"SYN,ACK"` |
+| `build_udp_header` | `(src_ip, dst_ip, src_port, dst_port, payload)` | An 8-byte UDP header, checksum filled in via the pseudo-header |
+| `build_icmp_echo` | `(identifier, sequence, payload[, is_reply])` | An ICMP echo request (default) or reply packet, checksum filled in |
+
+```
+set icmp = build_icmp_echo(1, 1, bytes_from_string("ping"))
+set packet = build_ip_header("192.168.1.10", "192.168.1.1", 1, icmp) + icmp
+print bytes_to_hex(packet)
+```
+
+`src_ip`/`dst_ip` need to be real for TCP/UDP headers even if you never
+send the packet — the checksum is computed over a pseudo-header that
+includes both addresses, per spec, so a wrong address produces a
+structurally valid but wire-invalid packet.
+
 ### Higher-order functions
 
 These call a NyxScript function value per item, so they're handled
@@ -150,6 +176,44 @@ socket.send(h, "GET / HTTP/1.0\r\n\r\n")
 print socket.recv_text(h, 4096, 5.0)
 socket.close(h)
 ```
+
+### `socket.raw_*` — raw IP send/receive (the "protocol builder")
+
+⚠️ **Requires `--unsafe`**, same as `socket.*` above, plus OS-level
+privileges (root on Linux/macOS, Administrator on Windows) — and even
+then, **raw send is not usable on Windows in practice**: `IP_HDRINCL`
+raw sockets are refused outright by the OS/network stack for every
+protocol, a restriction in place since Windows XP SP2, confirmed
+empirically during development on a fully administrator-elevated
+machine (the socket failed to even open, for ICMP as much as TCP/UDP).
+`socket.raw_recv` needs the same privileges and is similarly unreliable
+on Windows depending on the network adapter/driver/security software —
+Linux/macOS as root is the realistic target for this module.
+
+| Function | Signature | Description |
+|---|---|---|
+| `socket.raw_send` | `(dst_ip, packet[, timeout])` | Sends one complete IP packet (own header included, e.g. from `build_ip_header`) via `IP_HDRINCL`. Returns bytes sent. |
+| `socket.raw_recv` | `(interface_ip[, timeout])` | Opens a raw capture socket bound to a local interface, returns a handle. On Windows, flips on `SIO_RCVALL` (the standard Windows sniffer technique). |
+| `socket.raw_read` | `(handle[, max_bytes][, timeout])` | Reads one captured IP packet (header included) as a list of byte values |
+| `socket.close` | `(handle)` | Also closes a `raw_recv` handle (and flips `SIO_RCVALL` back off on Windows first) |
+
+```
+unsafe
+set icmp = build_icmp_echo(1, 1, bytes_from_string("ping"))
+set packet = build_ip_header("192.168.1.10", "192.168.1.1", 1, icmp) + icmp
+socket.raw_send("192.168.1.1", packet)
+```
+
+**`socket.raw_recv` only sees traffic addressed to the given interface**
+unless the OS additionally puts the NIC into promiscuous mode. On
+non-Windows platforms, NyxScript deliberately does *not* flip
+promiscuous mode itself (`ip link set <iface> promisc on` is a
+system-wide, shared setting — a much bigger blast radius than anything
+else `socket.*` touches, and not something a script should change as a
+side effect). If you need to capture other hosts' traffic on a shared
+segment, set the interface promiscuous outside NyxScript first, with
+the same authorization scrutiny you'd apply to any other packet
+capture — see [Security § `socket.raw_*`](Security#unsafe-gating).
 
 ## The `⚠️ {{`/`}}` regex gotcha — and the fix
 

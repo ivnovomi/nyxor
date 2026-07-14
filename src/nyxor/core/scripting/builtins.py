@@ -20,6 +20,7 @@ import json
 import multiprocessing as mp
 import random
 import re
+import socket as socket_module
 import threading
 import time
 from collections.abc import Callable
@@ -615,6 +616,211 @@ def _unpack_uint32(args: list[Any]) -> int:
     return _unpack_uint(4, "unpack_uint32", args)
 
 
+# ---------------------------------------------------------------------------
+# Raw packet crafting — pure byte-list builders, no network I/O, so none of
+# these need --unsafe (only actually *sending* the result via
+# socket.raw_send does). Headers are computed to spec (RFC 791 for IPv4,
+# RFC 793 for TCP, RFC 768 for UDP, RFC 792 for ICMP echo) including
+# checksums, so a script can hand the output straight to socket.raw_send.
+
+
+def _internet_checksum(data: bytes) -> int:
+    if len(data) % 2:
+        data = data + b"\x00"
+    total = 0
+    for i in range(0, len(data), 2):
+        total += (data[i] << 8) + data[i + 1]
+    while total >> 16:
+        total = (total & 0xFFFF) + (total >> 16)
+    return (~total) & 0xFFFF
+
+
+def _checksum(args: list[Any]) -> int:
+    if len(args) != 1:
+        raise _arity_error("checksum", "1 argument (a list of byte values)", len(args))
+    if not isinstance(args[0], list):
+        raise TypeError(f"checksum() expects a list, got {type(args[0]).__name__}")
+    try:
+        data = bytes(int(b) for b in args[0])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("checksum(): list must contain integers 0-255") from exc
+    return _internet_checksum(data)
+
+
+def _ipv4_to_bytes(name: str, value: Any) -> bytes:
+    try:
+        return socket_module.inet_aton(str(value))
+    except OSError as exc:
+        raise ValueError(f"{name}(): invalid IPv4 address {value!r}") from exc
+
+
+def _as_payload_bytes(name: str, payload: Any) -> bytes:
+    if not isinstance(payload, list):
+        raise TypeError(f"{name}(): payload must be a list of byte values")
+    try:
+        return bytes(int(b) for b in payload)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name}(): payload must contain integers 0-255") from exc
+
+
+def _build_ip_header(args: list[Any]) -> list[int]:
+    if len(args) not in (4, 5, 6, 7):
+        raise _arity_error(
+            "build_ip_header",
+            "4-7 arguments (src_ip, dst_ip, protocol, payload"
+            "[, ttl][, identification][, dont_fragment])",
+            len(args),
+        )
+    src_ip, dst_ip, protocol, payload = args[0], args[1], args[2], args[3]
+    ttl = int(args[4]) if len(args) > 4 else 64
+    identification = int(args[5]) if len(args) > 5 else 0
+    dont_fragment = bool(args[6]) if len(args) > 6 else False
+    payload_bytes = _as_payload_bytes("build_ip_header", payload)
+    total_length = 20 + len(payload_bytes)
+    if total_length > 0xFFFF:
+        raise ValueError("build_ip_header(): payload too large for a single IPv4 packet")
+    protocol_n = int(protocol)
+    if not (0 <= protocol_n <= 255):
+        raise ValueError(f"build_ip_header(): protocol must be 0-255, got {protocol_n}")
+    flags_fragment = 0x4000 if dont_fragment else 0
+    header = bytearray(20)
+    header[0] = (4 << 4) | 5  # version 4, IHL 5 (20-byte header, no options)
+    header[2:4] = total_length.to_bytes(2, "big")
+    header[4:6] = (identification & 0xFFFF).to_bytes(2, "big")
+    header[6:8] = flags_fragment.to_bytes(2, "big")
+    header[8] = ttl & 0xFF
+    header[9] = protocol_n
+    header[12:16] = _ipv4_to_bytes("build_ip_header", src_ip)
+    header[16:20] = _ipv4_to_bytes("build_ip_header", dst_ip)
+    csum = _internet_checksum(bytes(header))
+    header[10:12] = csum.to_bytes(2, "big")
+    return list(header)
+
+
+_TCP_FLAG_BITS = {
+    "FIN": 0x01,
+    "SYN": 0x02,
+    "RST": 0x04,
+    "PSH": 0x08,
+    "ACK": 0x10,
+    "URG": 0x20,
+    "ECE": 0x40,
+    "CWR": 0x80,
+}
+
+
+def _tcp_flags_byte(flags: Any) -> int:
+    if isinstance(flags, str):
+        value = 0
+        for part in flags.split(","):
+            name = part.strip().upper()
+            if not name:
+                continue
+            if name not in _TCP_FLAG_BITS:
+                raise ValueError(f"build_tcp_header(): unknown flag {name!r}")
+            value |= _TCP_FLAG_BITS[name]
+        return value
+    n = int(flags)
+    if not (0 <= n <= 255):
+        raise ValueError(f"build_tcp_header(): flags must be 0-255, got {n}")
+    return n
+
+
+def _build_tcp_header(args: list[Any]) -> list[int]:
+    if len(args) not in (8, 9):
+        raise _arity_error(
+            "build_tcp_header",
+            "8-9 arguments (src_ip, dst_ip, src_port, dst_port, seq, ack, "
+            "flags, payload[, window])",
+            len(args),
+        )
+    src_ip, dst_ip, src_port, dst_port, seq, ack, flags, payload = args[:8]
+    window = int(args[8]) if len(args) > 8 else 8192
+    payload_bytes = _as_payload_bytes("build_tcp_header", payload)
+    src_port_n, dst_port_n = int(src_port), int(dst_port)
+    for name, port in (("src_port", src_port_n), ("dst_port", dst_port_n)):
+        if not (0 <= port <= 0xFFFF):
+            raise ValueError(f"build_tcp_header(): {name} out of range: {port}")
+    seq_n, ack_n = int(seq) & 0xFFFFFFFF, int(ack) & 0xFFFFFFFF
+    flags_n = _tcp_flags_byte(flags)
+
+    header = bytearray(20)
+    header[0:2] = src_port_n.to_bytes(2, "big")
+    header[2:4] = dst_port_n.to_bytes(2, "big")
+    header[4:8] = seq_n.to_bytes(4, "big")
+    header[8:12] = ack_n.to_bytes(4, "big")
+    header[12] = 5 << 4  # data offset: 5 32-bit words (20 bytes, no options)
+    header[13] = flags_n
+    header[14:16] = (window & 0xFFFF).to_bytes(2, "big")
+
+    pseudo_header = (
+        _ipv4_to_bytes("build_tcp_header", src_ip)
+        + _ipv4_to_bytes("build_tcp_header", dst_ip)
+        + bytes([0, 6])  # zero byte + protocol number (TCP)
+        + (20 + len(payload_bytes)).to_bytes(2, "big")
+    )
+    csum = _internet_checksum(pseudo_header + bytes(header) + payload_bytes)
+    header[16:18] = csum.to_bytes(2, "big")
+    return list(header)
+
+
+def _build_udp_header(args: list[Any]) -> list[int]:
+    if len(args) != 5:
+        raise _arity_error(
+            "build_udp_header",
+            "5 arguments (src_ip, dst_ip, src_port, dst_port, payload)",
+            len(args),
+        )
+    src_ip, dst_ip, src_port, dst_port, payload = args
+    payload_bytes = _as_payload_bytes("build_udp_header", payload)
+    src_port_n, dst_port_n = int(src_port), int(dst_port)
+    for name, port in (("src_port", src_port_n), ("dst_port", dst_port_n)):
+        if not (0 <= port <= 0xFFFF):
+            raise ValueError(f"build_udp_header(): {name} out of range: {port}")
+    length = 8 + len(payload_bytes)
+    if length > 0xFFFF:
+        raise ValueError("build_udp_header(): payload too large")
+
+    header = bytearray(8)
+    header[0:2] = src_port_n.to_bytes(2, "big")
+    header[2:4] = dst_port_n.to_bytes(2, "big")
+    header[4:6] = length.to_bytes(2, "big")
+
+    pseudo_header = (
+        _ipv4_to_bytes("build_udp_header", src_ip)
+        + _ipv4_to_bytes("build_udp_header", dst_ip)
+        + bytes([0, 17])  # zero byte + protocol number (UDP)
+        + length.to_bytes(2, "big")
+    )
+    csum = _internet_checksum(pseudo_header + bytes(header) + payload_bytes)
+    # RFC 768: an all-zero computed UDP checksum is transmitted as all-ones,
+    # since all-zero on the wire means "no checksum was computed" instead.
+    header[6:8] = (csum or 0xFFFF).to_bytes(2, "big")
+    return list(header)
+
+
+def _build_icmp_echo(args: list[Any]) -> list[int]:
+    if len(args) not in (3, 4):
+        raise _arity_error(
+            "build_icmp_echo",
+            "3-4 arguments (identifier, sequence, payload[, is_reply])",
+            len(args),
+        )
+    identifier, sequence, payload = args[0], args[1], args[2]
+    is_reply = bool(args[3]) if len(args) > 3 else False
+    payload_bytes = _as_payload_bytes("build_icmp_echo", payload)
+    identifier_n, sequence_n = int(identifier) & 0xFFFF, int(sequence) & 0xFFFF
+
+    packet = bytearray(8 + len(payload_bytes))
+    packet[0] = 0 if is_reply else 8  # ICMP type: 0 = echo reply, 8 = echo request
+    packet[4:6] = identifier_n.to_bytes(2, "big")
+    packet[6:8] = sequence_n.to_bytes(2, "big")
+    packet[8:] = payload_bytes
+    csum = _internet_checksum(bytes(packet))
+    packet[2:4] = csum.to_bytes(2, "big")
+    return list(packet)
+
+
 BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "len": _len,
     "range": _range,
@@ -661,6 +867,11 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "pack_uint32": _pack_uint32,
     "unpack_uint16": _unpack_uint16,
     "unpack_uint32": _unpack_uint32,
+    "checksum": _checksum,
+    "build_ip_header": _build_ip_header,
+    "build_tcp_header": _build_tcp_header,
+    "build_udp_header": _build_udp_header,
+    "build_icmp_echo": _build_icmp_echo,
     "regex_match": _regex_match,
     "regex_find": _regex_find,
     "regex_find_all": _regex_find_all,

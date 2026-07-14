@@ -150,3 +150,56 @@ async def test_unknown_socket_function_is_a_lint_error() -> None:
         issue.severity == "error" and "unknown function 'socket.nope'" in issue.message
         for issue in issues
     )
+
+
+# ---------- raw_send / raw_recv / raw_read ----------
+#
+# Raw IP sockets are privilege- and platform-gated in ways a CI runner can't
+# control (root on Linux/macOS, and even then blocked outright on Windows —
+# confirmed empirically during development: IP_HDRINCL raw sockets failed to
+# open at all in a Windows environment with administrator rights). These
+# tests assert the --unsafe gate and clean, catchable error surface rather
+# than a specific outcome, since "succeeds" vs. "refused by the OS" both
+# need to be acceptable depending on where the suite runs.
+
+
+async def test_raw_send_is_refused_without_unsafe() -> None:
+    with pytest.raises(RuntimeScriptError, match="'socket' is disabled by default"):
+        await _run('socket.raw_send("127.0.0.1", [1, 2, 3])\n', unsafe=False)
+
+
+async def test_raw_recv_is_refused_without_unsafe() -> None:
+    with pytest.raises(RuntimeScriptError, match="'socket' is disabled by default"):
+        await _run('socket.raw_recv("127.0.0.1")\n', unsafe=False)
+
+
+async def test_raw_send_either_works_or_fails_with_a_clean_permission_error() -> None:
+    try:
+        sent = await _run(
+            'set pkt = build_ip_header("127.0.0.1", "127.0.0.1", 1, [])\n'
+            'print socket.raw_send("127.0.0.1", pkt)\n'
+        )
+        assert sent == ["20"]
+    except RuntimeScriptError as exc:
+        assert "raw_send" in str(exc)
+
+
+async def test_raw_recv_either_works_or_fails_with_a_clean_permission_error() -> None:
+    try:
+        lines = await _run(
+            'set h = socket.raw_recv("127.0.0.1", 1.0)\nprint "opened"\nsocket.close(h)\n'
+        )
+        assert lines == ["opened"]
+    except RuntimeScriptError as exc:
+        assert "raw_recv" in str(exc)
+
+
+async def test_raw_functions_are_lint_warnings_not_errors() -> None:
+    from nyxor.core.scripting import lint_source
+
+    issues = lint_source(
+        'unsafe\nsocket.raw_send("127.0.0.1", [1])\nset h = socket.raw_recv("127.0.0.1")\n'
+    )
+    assert all(issue.severity == "warning" for issue in issues)
+    assert any("raw_send" in issue.message for issue in issues)
+    assert any("raw_recv" in issue.message for issue in issues)

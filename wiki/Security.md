@@ -2,12 +2,17 @@
 
 ## Design principles
 
-- **Passive only, always.** DNS lookups, TLS handshakes, HTTP requests,
-  public certificate-transparency logs, response-header/cookie/markup
-  fingerprinting. No exploitation, no packet crafting, no raw sockets,
+- **Passive by default, always.** `nyx`'s own audit/dns/tls/http/network
+  modules — the only thing usable via `nyx mcp` — stay strictly to DNS
+  lookups, TLS handshakes, HTTP requests, public certificate-transparency
+  logs, response-header/cookie/markup fingerprinting: no exploitation,
   nothing that needs elevated privileges. `nyx hostcheck` is the same
   story locally — two explainable, signature-free checks (masquerading
-  processes, suspicious autorun), not an antivirus.
+  processes, suspicious autorun), not an antivirus. NyxScript's opt-in
+  `socket.*`/`socket.raw_*` (below) are the one deliberate exception —
+  gated behind `--unsafe`, never reachable through `nyx mcp`, and each
+  a considered scope decision, not a quiet crack in "passive by
+  default".
 - **Only audit what you're authorized to.** "Passive" doesn't mean
   "permitted" — point NYXOR at infrastructure you own or have explicit
   authorization to assess.
@@ -158,6 +163,60 @@ via `asyncio.to_thread`, connections a script forgets to close are
 cleaned up automatically at the end of a one-shot run), but the
 capability itself is a deliberate, considered expansion, not something
 that crept in as a side effect of another feature.
+
+## `socket.raw_*` and the packet builder — a second, larger identity shift
+
+`checksum`/`build_ip_header`/`build_tcp_header`/`build_udp_header`/
+`build_icmp_echo` (pure, no `--unsafe`) plus `socket.raw_send`/
+`socket.raw_recv`/`socket.raw_read` (behind `--unsafe`, like the rest of
+`socket.*`) are a second step past `socket.connect`/`send`/`recv`, and a
+meaningfully bigger one: `socket.connect` still asks the OS to establish
+a normal, well-formed connection on the caller's behalf — the kernel's
+TCP/UDP stack won't let a script lie about who it is. `socket.raw_send`
+hands the kernel a fully-formed IP packet, source address included, and
+asks it to just put that on the wire — a script can put someone else's
+address in the source field. That's IP spoofing capability, not just
+"talk to more hosts than the audited scan modules cover", and it's why
+this shipped as its own explicit `AskUserQuestion` scope decision rather
+than folding into the existing `socket.*` gate silently: the maintainer
+was shown the three-way split (packet builder only / + raw send / +
+raw receive-and-sniff) with each tier's implications spelled out, and
+chose the full set.
+
+`socket.raw_recv` is the largest step of the three. `socket.raw_send`
+still only affects packets the *script itself* originates; a capture
+socket can observe traffic the script had no hand in creating —
+depending on the network segment and OS, that can include other
+devices' traffic, not just the host running NYXOR. NyxScript
+deliberately does not flip a NIC into promiscuous mode on the caller's
+behalf (see [NyxScript Standard Library Reference §
+`socket.raw_*`](NyxScript-Standard-Library-Reference#socketraw_--raw-ip-sendreceive-the-protocol-builder))
+— that's a shared, system-wide setting change with a blast radius well
+past "reaches a network host `socket.*` wasn't scoped for", and it's the
+one place where NYXOR's usual authorization framing ("audit hosts
+you're authorized to assess") isn't quite sufficient on its own: capturing
+traffic on a shared segment can implicate devices and traffic that
+belong to someone who never consented to being observed, even if the
+person running the script is authorized against the target host. Treat
+this the same as you would any other packet-capture tool — get
+authorization for the network segment, not just the target.
+
+**What was actually verified, not assumed**: this was tested against a
+real, administrator-elevated Windows environment during development,
+not just reasoned about from documentation. The results matter for
+setting expectations: `IP_HDRINCL` raw sockets — required for
+`socket.raw_send` and for `socket.raw_recv`'s Windows `SIO_RCVALL` path
+— were refused outright by the OS/network stack for every IP protocol
+tried (ICMP included), even with a fully elevated administrator token.
+Raw ICMP *without* `IP_HDRINCL` (letting the OS build the IP header
+itself) worked fine in the same environment — but that's a different,
+narrower capability than the full custom-header packet builder exposes,
+and isn't what `socket.raw_send` implements. In practice, this module's
+realistic home is root on Linux/macOS; treat Windows support as
+"present in the code, refused by the OS" rather than "works". Both
+outcomes — success and a clean, catchable `PermissionError`/`OSError` —
+are covered by tests, since which one applies depends on where NYXOR
+runs, not on a bug either way.
 
 A script can also self-enable them with a bare `unsafe` statement
 instead of the caller passing `--unsafe` — see

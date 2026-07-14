@@ -100,6 +100,16 @@ _BUILTIN_DOCS = {
     "pack_uint32": "`pack_uint32(n)` — n as 4 big-endian bytes (a list).",
     "unpack_uint16": "`unpack_uint16(list)` — 2 big-endian bytes back to an int.",
     "unpack_uint32": "`unpack_uint32(list)` — 4 big-endian bytes back to an int.",
+    "checksum": "`checksum(list)` — the Internet checksum (RFC 1071) of a list of byte values.",
+    "build_ip_header": "`build_ip_header(src_ip, dst_ip, protocol, payload[, ttl][, id]"
+    "[, dont_fragment])` — a 20-byte IPv4 header with checksum filled in.",
+    "build_tcp_header": "`build_tcp_header(src_ip, dst_ip, src_port, dst_port, seq, ack, "
+    'flags, payload[, window])` — a 20-byte TCP header with checksum filled in; flags '
+    'is an int bitmask or a string like "SYN,ACK".',
+    "build_udp_header": "`build_udp_header(src_ip, dst_ip, src_port, dst_port, payload)` "
+    "— an 8-byte UDP header with checksum filled in.",
+    "build_icmp_echo": "`build_icmp_echo(identifier, sequence, payload[, is_reply])` — "
+    "an ICMP echo request/reply packet with checksum filled in.",
 }
 
 _UI_DOCS = {
@@ -119,7 +129,15 @@ _SOCKET_DOCS = {
     "of ints.",
     "socket.recv_text": "`socket.recv_text(handle[, max_bytes][, timeout])` — reads bytes "
     "as UTF-8.",
-    "socket.close": "`socket.close(handle)` — closes the connection.",
+    "socket.close": "`socket.close(handle)` — closes the connection (also valid for a "
+    "raw_recv handle).",
+    "socket.raw_send": "`socket.raw_send(dst_ip, packet[, timeout])` — sends one complete "
+    "IP packet via IP_HDRINCL. Needs root on Linux/macOS; not usable on Windows (blocked "
+    "by the OS even for an administrator).",
+    "socket.raw_recv": "`socket.raw_recv(interface_ip[, timeout])` — opens a raw capture "
+    "socket bound to a local interface, returns a handle. Requires administrator/root.",
+    "socket.raw_read": "`socket.raw_read(handle[, max_bytes][, timeout])` — reads one "
+    "captured IP packet (header included) as a list of byte values.",
 }
 
 _MODULE_DOCS = {
