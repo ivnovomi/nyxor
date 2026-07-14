@@ -104,7 +104,7 @@ _BUILTIN_DOCS = {
     "build_ip_header": "`build_ip_header(src_ip, dst_ip, protocol, payload[, ttl][, id]"
     "[, dont_fragment])` — a 20-byte IPv4 header with checksum filled in.",
     "build_tcp_header": "`build_tcp_header(src_ip, dst_ip, src_port, dst_port, seq, ack, "
-    'flags, payload[, window])` — a 20-byte TCP header with checksum filled in; flags '
+    "flags, payload[, window])` — a 20-byte TCP header with checksum filled in; flags "
     'is an int bitmask or a string like "SYN,ACK".',
     "build_udp_header": "`build_udp_header(src_ip, dst_ip, src_port, dst_port, payload)` "
     "— an 8-byte UDP header with checksum filled in.",
@@ -122,11 +122,10 @@ _UI_DOCS = {
 }
 
 _SOCKET_DOCS = {
-    "socket.connect": '`socket.connect(host, port[, protocol][, timeout])` — opens a TCP/UDP '
+    "socket.connect": "`socket.connect(host, port[, protocol][, timeout])` — opens a TCP/UDP "
     "connection, returns a handle. Requires --unsafe.",
     "socket.send": "`socket.send(handle, data)` — sends a string or list of byte values.",
-    "socket.recv": "`socket.recv(handle[, max_bytes][, timeout])` — reads bytes as a list "
-    "of ints.",
+    "socket.recv": "`socket.recv(handle[, max_bytes][, timeout])` — reads bytes as a list of ints.",
     "socket.recv_text": "`socket.recv_text(handle[, max_bytes][, timeout])` — reads bytes "
     "as UTF-8.",
     "socket.close": "`socket.close(handle)` — closes the connection (also valid for a "

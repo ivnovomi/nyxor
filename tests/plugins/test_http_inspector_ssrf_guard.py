@@ -20,7 +20,10 @@ async def test_validate_url_is_checked_on_the_initial_request(
         seen.append(url)
 
     await inspect(
-        "https://example.com", timeout=5.0, follow_redirects=True, max_redirects=5,
+        "https://example.com",
+        timeout=5.0,
+        follow_redirects=True,
+        max_redirects=5,
         validate_url=validate_url,
     )
 
@@ -51,7 +54,10 @@ async def test_validate_url_is_checked_on_every_redirect_hop(
         seen.append(url)
 
     await inspect(
-        "https://start.example", timeout=5.0, follow_redirects=True, max_redirects=5,
+        "https://start.example",
+        timeout=5.0,
+        follow_redirects=True,
+        max_redirects=5,
         validate_url=validate_url,
     )
 
@@ -76,6 +82,9 @@ async def test_a_rejected_redirect_hop_aborts_the_inspection(
 
     with pytest.raises(ValueError, match="169.254.169.254"):
         await inspect(
-            "https://start.example", timeout=5.0, follow_redirects=True, max_redirects=5,
+            "https://start.example",
+            timeout=5.0,
+            follow_redirects=True,
+            max_redirects=5,
             validate_url=validate_url,
         )

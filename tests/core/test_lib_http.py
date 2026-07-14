@@ -30,9 +30,7 @@ class _MockHttpServer:
         self.server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
         return self.server.sockets[0].getsockname()[1]
 
-    async def _handle(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
+    async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         request = await reader.read(65536)
         self.last_request = request
         body = b'{"ok": true}'
@@ -100,19 +98,14 @@ print resp["status_code"]
 
 
 async def test_build_request_default_headers() -> None:
-    lines = await _run(
-        'print http.build_request("GET", "/x", "example.com", {}, "")\n'
-    )
-    assert lines == ['GET /x HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n']
+    lines = await _run('print http.build_request("GET", "/x", "example.com", {}, "")\n')
+    assert lines == ["GET /x HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n"]
 
 
 async def test_build_request_includes_content_length_for_a_body() -> None:
-    lines = await _run(
-        'print http.build_request("POST", "/x", "example.com", {}, "abc")\n'
-    )
+    lines = await _run('print http.build_request("POST", "/x", "example.com", {}, "abc")\n')
     assert lines == [
-        'POST /x HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n'
-        'Content-Length: 3\r\n\r\nabc'
+        "POST /x HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\nContent-Length: 3\r\n\r\nabc"
     ]
 
 
@@ -121,18 +114,18 @@ async def test_build_request_respects_a_caller_supplied_host_header() -> None:
         'print http.build_request("GET", "/x", "ignored.example", '
         '{"Host": "override.example"}, "")\n'
     )
-    assert lines == ['GET /x HTTP/1.1\r\nHost: override.example\r\nConnection: close\r\n\r\n']
+    assert lines == ["GET /x HTTP/1.1\r\nHost: override.example\r\nConnection: close\r\n\r\n"]
 
 
 async def test_parse_response_splits_status_headers_and_body() -> None:
     lines = await _run(
-        r'''
+        r"""
 set resp = http.parse_response("HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nnope")
 print resp["status_code"]
 print resp["status_text"]
 print resp["headers"]["content-type"]
 print resp["body"]
-'''
+"""
     )
     assert lines == ["404", "Not Found", "text/plain", "nope"]
 

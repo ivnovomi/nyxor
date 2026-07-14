@@ -6,7 +6,7 @@ from nyxor.core.config import load_config
 from nyxor.core.scripting import run_script
 from nyxor.core.scripting.errors import RuntimeScriptError
 
-_SOURCE = 'unsafe\npython:\n    result = 6 * 7\nend\nprint result\n'
+_SOURCE = "unsafe\npython:\n    result = 6 * 7\nend\nprint result\n"
 
 
 async def _run(*, unsafe: bool = False, allow_unsafe_directive: bool = True) -> list[str]:

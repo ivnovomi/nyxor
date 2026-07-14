@@ -145,8 +145,9 @@ class ScriptSocket:
         try:
             sock = await asyncio.to_thread(_do_connect)
         except ssl.SSLError as exc:
-            raise ssl.SSLError(f"socket.connect_tls(): TLS handshake with {host}:{port} "
-                                f"failed — {exc}") from exc
+            raise ssl.SSLError(
+                f"socket.connect_tls(): TLS handshake with {host}:{port} failed — {exc}"
+            ) from exc
         except OSError as exc:
             raise TimeoutError(
                 f"socket.connect_tls(): could not reach {host}:{port} — {exc}"
@@ -163,8 +164,10 @@ class ScriptSocket:
         handle, data = args
         conn = self._get(handle)
         if conn.protocol == "raw_recv":
-            raise TypeError("socket.send(): handle is a raw_recv capture socket, not a "
-                             "connection — use socket.raw_send() to transmit")
+            raise TypeError(
+                "socket.send(): handle is a raw_recv capture socket, not a "
+                "connection — use socket.raw_send() to transmit"
+            )
         payload = _to_bytes(data, who="socket.send()")
         try:
             await asyncio.to_thread(conn.sock.sendall, payload)
@@ -182,8 +185,9 @@ class ScriptSocket:
             raise ValueError(f"socket.recv(): max_bytes must be in (0, {_MAX_RECV_BYTES}]")
         conn = self._get(handle)
         if conn.protocol == "raw_recv":
-            raise TypeError("socket.recv(): handle is a raw_recv capture socket — use "
-                             "socket.raw_read() instead")
+            raise TypeError(
+                "socket.recv(): handle is a raw_recv capture socket — use socket.raw_read() instead"
+            )
 
         def _do_recv() -> bytes:
             if timeout is not None:
@@ -280,7 +284,10 @@ class ScriptSocket:
             promiscuous = False
             if _IS_WINDOWS:
                 sock.setsockopt(socket_module.IPPROTO_IP, socket_module.IP_HDRINCL, 1)
-                sock.ioctl(socket_module.SIO_RCVALL, socket_module.RCVALL_ON)
+                sock.ioctl(  # type: ignore[attr-defined]
+                    socket_module.SIO_RCVALL,  # type: ignore[attr-defined]
+                    socket_module.RCVALL_ON,  # type: ignore[attr-defined]
+                )
                 promiscuous = True
             return sock, promiscuous
 
@@ -335,7 +342,10 @@ class ScriptSocket:
             def _do_close() -> None:
                 if conn.promiscuous:
                     with contextlib.suppress(OSError):
-                        conn.sock.ioctl(socket_module.SIO_RCVALL, socket_module.RCVALL_OFF)
+                        conn.sock.ioctl(  # type: ignore[attr-defined]
+                            socket_module.SIO_RCVALL,  # type: ignore[attr-defined]
+                            socket_module.RCVALL_OFF,  # type: ignore[attr-defined]
+                        )
                 conn.sock.close()
 
             await asyncio.to_thread(_do_close)
