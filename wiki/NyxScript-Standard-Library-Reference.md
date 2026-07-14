@@ -164,6 +164,7 @@ one-shot run (`nyx script run`, the TUI's Run button) ends.
 | Function | Signature | Description |
 |---|---|---|
 | `socket.connect` | `(host, port[, protocol][, timeout])` | Opens a `"tcp"` (default) or `"udp"` connection, returns a handle |
+| `socket.connect_tls` | `(host, port[, timeout][, verify])` | Opens a TCP connection and performs a TLS handshake over it; returns an ordinary handle — every other `socket.*` function works on it unchanged. `verify` (default `true`) validates the certificate; `false` is an explicit opt-out for a host with a self-signed/invalid cert on purpose |
 | `socket.send` | `(handle, data)` | Sends a string (UTF-8 encoded) or a list of byte values |
 | `socket.recv` | `(handle[, max_bytes][, timeout])` | Reads available data as a list of byte values (default 4096 bytes, capped at 1 MiB) |
 | `socket.recv_text` | `(handle[, max_bytes][, timeout])` | Same, decoded as UTF-8 (errors on non-text data — use `socket.recv` + `bytes_to_hex` for binary protocols) |
@@ -174,6 +175,16 @@ unsafe
 set h = socket.connect("example.com", 80)
 socket.send(h, "GET / HTTP/1.0\r\n\r\n")
 print socket.recv_text(h, 4096, 5.0)
+socket.close(h)
+```
+
+`socket.connect_tls` works identically, just over port 443:
+
+```
+unsafe
+set h = socket.connect_tls("example.com", 443)
+socket.send(h, "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+print socket.recv_text(h, 65536, 5.0)
 socket.close(h)
 ```
 
@@ -463,6 +474,39 @@ Treating "the last `\d{3} ` line in whatever came back" as the answer
 silently returns the wrong response in that case; the fix parses one
 line at a time and stops at the first complete response, stashing
 anything read past it for the next call.
+
+### `lib/http.nyx`
+
+A minimal HTTP/1.1 client built on `socket.*`/`socket.connect_tls` — the
+"protocol builder" HTTP piece, distinct from the audited, passive `run
+http` module. Requires `--unsafe` transitively. Every request sends
+`Connection: close` and reads until the server closes the connection —
+there's no chunked transfer-encoding or keep-alive support, so this is
+a scriptable request/response tool, not a full HTTP client.
+
+| Function | Params | Description |
+|---|---|---|
+| `request` | `(method, url, headers, body, timeout)` | Sends one request, returns `{status_code, status_text, headers, body}` |
+| `get` | `(url, headers, timeout)` | `request("GET", url, headers, "", timeout)` |
+| `post` | `(url, body, headers, timeout)` | `request("POST", url, headers, body, timeout)` |
+| `build_request` | `(method, path, host, headers, body)` | Builds a raw HTTP/1.1 request as text — adds `Host`/`Connection`/`Content-Length` automatically unless already present in `headers` |
+| `parse_response` | `(raw)` | Parses a raw HTTP response string into `{status_code, status_text, headers, body}` (header keys lowercased) |
+
+```
+unsafe
+import "lib/http.nyx" as http
+
+set resp = http.get("https://example.com/", {}, 8.0)
+print resp["status_code"]
+print resp["headers"]["content-type"]
+print resp["body"]
+```
+
+`request()`/`get()`/`post()` pick `socket.connect` or
+`socket.connect_tls` based on the URL's scheme (`http://` vs
+`https://`, defaulting to `http://` and port 80 if no scheme is given).
+URL parsing is intentionally minimal — enough to split scheme/host/
+port/path for sending a request, not a full RFC 3986 parser.
 
 ### `lib/asset.nyx`
 

@@ -263,7 +263,12 @@ which needs a live terminal), `ftp.nyx` (`connect`, `login`/
 `anonymous_login`, `pwd`, `cwd`, `set_binary_mode`/`set_ascii_mode`,
 `list`, `retr`, `quit` — a minimal read-oriented FTP client built on
 `socket.*`, requires `--unsafe` transitively; connection objects are
-plain dicts, pass the same one into every call).
+plain dicts, pass the same one into every call), `http.nyx` (`request`,
+`get`, `post`, `build_request`, `parse_response` — a minimal HTTP/1.1
+client built on `socket.connect`/`socket.connect_tls`, requires
+`--unsafe` transitively; picks TLS automatically from the URL's
+scheme; no chunked transfer-encoding or keep-alive, sends
+`Connection: close` and reads until the server closes).
 Reach for these before reimplementing — e.g. don't hand-roll a dict merge
 when `dict.merge(a, b)` already exists, or a retry loop when
 `time.backoff_delay` already does exponential backoff.
@@ -308,6 +313,18 @@ values, `socket.recv_text(...)` → UTF-8 string, `socket.close(handle)`.
 Every blocking call has an explicit timeout; a one-shot run (`nyx
 script run`, the TUI's Run button) auto-closes connections a script
 left open.
+
+`socket.connect_tls(host, port[, timeout][, verify])` → handle — same
+handle, same send/recv/close, just TLS-wrapped (`ssl.create_default_
+context()`). `verify` defaults `true`; pass `false` only when a host's
+self-signed/invalid cert is expected and accepted on purpose.
+
+```
+unsafe
+set h = socket.connect_tls("example.com", 443)
+socket.send(h, "GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n")
+print socket.recv_text(h, 65536, 5.0)
+```
 
 `socket.raw_send(dst_ip, packet[, timeout])` sends one complete IP
 packet (own header included, from `build_ip_header`) via `IP_HDRINCL` —

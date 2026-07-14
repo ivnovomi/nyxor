@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import socket as socket_module
+import ssl
 import sys
 from typing import Any
 
@@ -110,6 +111,50 @@ class ScriptSocket:
         handle = self._next_handle
         self._next_handle += 1
         self._connections[handle] = _Connection(sock, protocol)
+        return handle
+
+    async def connect_tls(self, args: list[Any]) -> int:
+        """Opens a TCP connection and performs a TLS handshake over it.
+
+        Returns an ordinary handle — every other socket.* function
+        (send/recv/recv_text/close) works on it unchanged, since TLS is
+        just a wrapped socket underneath. Certificate verification is on
+        by default, like everything else in this project; ``verify:
+        false`` is an explicit, documented opt-out for talking to a host
+        with a self-signed/invalid cert on purpose, not a silent default.
+        """
+        if not (2 <= len(args) <= 4):
+            raise TypeError("socket.connect_tls() expects (host, port[, timeout][, verify])")
+        host = str(args[0])
+        port = int(args[1])
+        timeout = float(args[2]) if len(args) >= 3 else _DEFAULT_TIMEOUT
+        verify = bool(args[3]) if len(args) >= 4 else True
+        if not (1 <= port <= 65535):
+            raise TypeError(f"socket.connect_tls(): port {port} is out of range")
+
+        def _do_connect() -> socket_module.socket:
+            raw_sock = socket_module.socket(socket_module.AF_INET, socket_module.SOCK_STREAM)
+            raw_sock.settimeout(timeout)
+            raw_sock.connect((host, port))
+            context = ssl.create_default_context()
+            if not verify:
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+            return context.wrap_socket(raw_sock, server_hostname=host)
+
+        try:
+            sock = await asyncio.to_thread(_do_connect)
+        except ssl.SSLError as exc:
+            raise ssl.SSLError(f"socket.connect_tls(): TLS handshake with {host}:{port} "
+                                f"failed — {exc}") from exc
+        except OSError as exc:
+            raise TimeoutError(
+                f"socket.connect_tls(): could not reach {host}:{port} — {exc}"
+            ) from exc
+
+        handle = self._next_handle
+        self._next_handle += 1
+        self._connections[handle] = _Connection(sock, "tcp")
         return handle
 
     async def send(self, args: list[Any]) -> int:
@@ -308,5 +353,15 @@ class ScriptSocket:
 
 #: Method names reachable as ``socket.<name>(...)`` from NyxScript.
 SOCKET_FUNCTIONS = frozenset(
-    {"connect", "send", "recv", "recv_text", "close", "raw_send", "raw_recv", "raw_read"}
+    {
+        "connect",
+        "connect_tls",
+        "send",
+        "recv",
+        "recv_text",
+        "close",
+        "raw_send",
+        "raw_recv",
+        "raw_read",
+    }
 )

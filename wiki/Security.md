@@ -164,6 +164,26 @@ cleaned up automatically at the end of a one-shot run), but the
 capability itself is a deliberate, considered expansion, not something
 that crept in as a side effect of another feature.
 
+## `socket.connect_tls` and `lib/http.nyx`
+
+`socket.connect_tls` is a TLS-wrapped `socket.connect` — same
+`--unsafe` gate, same handle-based API, no new capability class beyond
+"the connection happens to be encrypted." Certificate verification is
+on by default (`ssl.create_default_context()`, the same defaults
+Python's own `ssl`/`httpx` use); `verify: false` is an explicit,
+documented opt-out for a script that needs to talk to a host with a
+self-signed or otherwise invalid certificate on purpose — the same
+posture as everything else `--unsafe`-gated here: safe by default, with
+an opt-out a reviewer can spot in a diff rather than a silent one.
+Verified against both outcomes during development with a local,
+throwaway self-signed certificate: `verify: true` correctly rejects it
+(no real network or CA involved), `verify: false` connects.
+
+`lib/http.nyx` is a thin HTTP/1.1 client built entirely on
+`socket.connect`/`socket.connect_tls` — it doesn't add any capability
+`socket.*` didn't already have, just packages request/response framing
+on top of it, the same relationship `lib/ftp.nyx` has to `socket.*`.
+
 ## `socket.raw_*` and the packet builder — a second, larger identity shift
 
 `checksum`/`build_ip_header`/`build_tcp_header`/`build_udp_header`/

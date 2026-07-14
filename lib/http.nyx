@@ -1,0 +1,163 @@
+# A minimal HTTP/1.1 client built on socket.*/socket.connect_tls — the
+# "protocol builder" HTTP piece, distinct from the audited, passive `run
+# http` module. Requires --unsafe transitively (every request() call
+# opens a real socket). Every request sends "Connection: close" and reads
+# until the server closes the connection, so there's no chunked
+# transfer-encoding or keep-alive framing support — good enough for a
+# scriptable request/response, not a full HTTP client.
+
+import "lib/validate.nyx" as validate
+
+func request(method, url, headers, body, timeout):
+    "Sends one HTTP request and returns {status_code, status_text, headers, body}."
+    set parsed = _parse_url(url)
+    set h = 0
+    if parsed["scheme"] == "https":
+        set h = socket.connect_tls(parsed["host"], parsed["port"], timeout)
+    else:
+        set h = socket.connect(parsed["host"], parsed["port"], "tcp", timeout)
+    end
+
+    set req = build_request(method, parsed["path"], parsed["host"], headers, body)
+    socket.send(h, req)
+    set raw = _read_all(h, timeout)
+    socket.close(h)
+    return parse_response(raw)
+end
+
+func get(url, headers, timeout):
+    "Convenience for request(\"GET\", url, headers, \"\", timeout)."
+    return request("GET", url, headers, "", timeout)
+end
+
+func post(url, body, headers, timeout):
+    "Convenience for request(\"POST\", url, headers, body, timeout)."
+    return request("POST", url, headers, body, timeout)
+end
+
+func build_request(method, path, host, headers, body):
+    "Builds a raw HTTP/1.1 request as text. Adds Host/Connection/Content-Length if not already in headers."
+    set lines = [method + " " + path + " HTTP/1.1"]
+    set has_host = false
+    set has_connection = false
+    set has_length = false
+
+    foreach pair in items(headers):
+        set key = pair[0]
+        set value = pair[1]
+        set lines = lines + [key + ": " + str(value)]
+        if lower(key) == "host":
+            set has_host = true
+        end
+        if lower(key) == "connection":
+            set has_connection = true
+        end
+        if lower(key) == "content-length":
+            set has_length = true
+        end
+    end
+
+    if not has_host:
+        set lines = [lines[0], "Host: " + host] + lines[1:len(lines)]
+    end
+    if not has_connection:
+        set lines = lines + ["Connection: close"]
+    end
+    if not has_length and len(body) > 0:
+        set lines = lines + ["Content-Length: " + str(len(bytes_from_string(body)))]
+    end
+
+    return join(lines, "\r\n") + "\r\n\r\n" + body
+end
+
+func parse_response(raw):
+    "Parses a raw HTTP response into {status_code, status_text, headers, body}."
+    set sep = find(raw, "\r\n\r\n")
+    set head = raw
+    set body = ""
+    if sep >= 0:
+        set head = raw[:sep]
+        set body = raw[sep + 4:len(raw)]
+    end
+
+    set lines = split(head, "\r\n")
+    set status_line = lines[0]
+    set status_code = 0
+    set status_text = ""
+    set first_space = find(status_line, " ")
+    if first_space >= 0:
+        set rest = strip(status_line[first_space + 1:len(status_line)])
+        set second_space = find(rest, " ")
+        if second_space >= 0:
+            set status_code = int(rest[:second_space])
+            set status_text = strip(rest[second_space + 1:len(rest)])
+        else:
+            set status_code = int(rest)
+        end
+    end
+
+    set resp_headers = {}
+    set i = 1
+    while i < len(lines):
+        set line = lines[i]
+        set colon = find(line, ":")
+        if colon >= 0:
+            set key = lower(strip(line[:colon]))
+            set value = strip(line[colon + 1:len(line)])
+            set resp_headers[key] = value
+        end
+        set i = i + 1
+    end
+
+    return {"status_code": status_code, "status_text": status_text, "headers": resp_headers, "body": body}
+end
+
+# --- internals -------------------------------------------------------------
+
+func _parse_url(url):
+    "Splits a URL into {scheme, host, port, path}. Not a full RFC 3986 parser — just enough to send a request."
+    set scheme = "http"
+    set rest = url
+    set scheme_end = find(url, "://")
+    if scheme_end >= 0:
+        set scheme = lower(url[:scheme_end])
+        set rest = url[scheme_end + 3:len(url)]
+    end
+
+    set path = "/"
+    set hostport = rest
+    set path_start = find(rest, "/")
+    if path_start >= 0:
+        set hostport = rest[:path_start]
+        set path = rest[path_start:len(rest)]
+    end
+
+    set default_port = 80
+    if scheme == "https":
+        set default_port = 443
+    end
+
+    set host = hostport
+    set port = default_port
+    set colon = find(hostport, ":")
+    if colon >= 0:
+        set host = hostport[:colon]
+        set port_str = hostport[colon + 1:len(hostport)]
+        if validate.is_valid_port(port_str):
+            set port = int(port_str)
+        end
+    end
+
+    return {"scheme": scheme, "host": host, "port": port, "path": path}
+end
+
+func _read_all(h, timeout):
+    "Reads from a connection until the server closes it (empty read)."
+    set out = ""
+    set chunk = socket.recv_text(h, 65536, timeout)
+    while len(chunk) > 0:
+        set out = out + chunk
+        set chunk = socket.recv_text(h, 65536, timeout)
+    end
+    return out
+end
