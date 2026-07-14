@@ -1,0 +1,41 @@
+# Renders headers + rows as an aligned, plain-text table — for building
+# a string to print/save, unlike the interactive ui.table (which prints
+# directly and needs a live terminal, via nyx script run/nyx tui).
+
+func render(headers, rows):
+    "Renders headers and rows as an aligned, pipe-delimited plain-text table."
+    set widths = map(headers, lambda(h): len(str(h)))
+
+    foreach row in rows:
+        set i = 0
+        while i < len(row):
+            set cell_len = len(str(row[i]))
+            if cell_len > widths[i]:
+                set widths[i] = cell_len
+            end
+            set i = i + 1
+        end
+    end
+
+    set out_lines = [_render_row(headers, widths), _render_separator(widths)]
+    foreach row in rows:
+        set out_lines = out_lines + [_render_row(row, widths)]
+    end
+    return join(out_lines, "\n")
+end
+
+func _render_row(row, widths):
+    set cells = []
+    set i = 0
+    while i < len(row):
+        set text = str(row[i])
+        set cells = cells + [text + (" " * (widths[i] - len(text)))]
+        set i = i + 1
+    end
+    return "| " + join(cells, " | ") + " |"
+end
+
+func _render_separator(widths):
+    set parts = map(widths, lambda(w): "-" * (w + 2))
+    return "+" + join(parts, "+") + "+"
+end

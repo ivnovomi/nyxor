@@ -1,0 +1,77 @@
+# More string helpers, on top of the builtins and lib/strings.nyx —
+# note the native `*` operator already repeats a string ("x" * 3), so
+# there's no separate repeat() here.
+
+func capitalize(s):
+    "Uppercases just the first character, lowercases the rest."
+    if len(s) == 0:
+        return s
+    end
+    return upper(s[0:1]) + lower(s[1:])
+end
+
+func center(s, width, ch):
+    "Centers s in a field of width, padded with ch on both sides."
+    if len(s) >= width:
+        return s
+    end
+    set total_pad = width - len(s)
+    set left = int(total_pad / 2)
+    set right = total_pad - left
+    return (ch * left) + s + (ch * right)
+end
+
+func reverse(s):
+    "s with its characters in reverse order."
+    set out = ""
+    set i = len(s) - 1
+    while i >= 0:
+        set out = out + s[i]
+        set i = i - 1
+    end
+    return out
+end
+
+func contains_ignore_case(text, needle):
+    "Case-insensitive substring test."
+    return contains(lower(text), lower(needle))
+end
+
+func count_occurrences(text, needle):
+    "How many non-overlapping times needle appears in text."
+    if len(needle) == 0:
+        return 0
+    end
+    set count = 0
+    set offset = 0
+    set idx = find(text[offset:], needle)
+    while idx >= 0:
+        set count = count + 1
+        set offset = offset + idx + len(needle)
+        set idx = find(text[offset:], needle)
+    end
+    return count
+end
+
+func is_blank(s):
+    "True if s is empty or contains only whitespace."
+    return len(strip(s)) == 0
+end
+
+func words(s):
+    "Every whitespace-separated word in s."
+    return regex_find_all(s, r"\S+")
+end
+
+func lines(s):
+    "Splits s into a list of lines on \n, keeping empty lines."
+    return split(s, "\n")
+end
+
+func slugify(s):
+    "Lowercases s and collapses runs of non-alphanumeric characters into a single hyphen, trimming leading/trailing hyphens."
+    set out = regex_replace(lower(s), r"[^a-z0-9]+", "-")
+    set out = regex_replace(out, r"^-+", "")
+    set out = regex_replace(out, r"-+$", "")
+    return out
+end

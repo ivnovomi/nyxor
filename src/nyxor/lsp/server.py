@@ -88,6 +88,9 @@ _BUILTIN_DOCS = {
     "regex_find": "`regex_find(text, pattern, default)` — first match, or default if none.",
     "regex_find_all": "`regex_find_all(text, pattern)` — every match as a list.",
     "regex_replace": "`regex_replace(text, pattern, replacement)` — substitutes every match.",
+    "base64_encode": "`base64_encode(s)` — base64-encodes s (UTF-8 encoded first).",
+    "base64_decode": "`base64_decode(s)` — decodes base64 s back to a UTF-8 string.",
+    "random": "`random()` — a random float in [0.0, 1.0).",
 }
 
 _UI_DOCS = {

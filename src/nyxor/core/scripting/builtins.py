@@ -13,10 +13,12 @@ enough to protect against a catastrophic-backtracking pattern.
 
 from __future__ import annotations
 
+import base64
 import contextlib
 import hashlib
 import json
 import multiprocessing as mp
+import random
 import re
 import threading
 import time
@@ -500,6 +502,36 @@ def _md5(args: list[Any]) -> str:
     return hashlib.md5(str(args[0]).encode("utf-8")).hexdigest()
 
 
+def _base64_encode(args: list[Any]) -> str:
+    if len(args) != 1:
+        raise _arity_error("base64_encode", "1 argument", len(args))
+    return base64.b64encode(str(args[0]).encode("utf-8")).decode("ascii")
+
+
+def _base64_decode(args: list[Any]) -> str:
+    if len(args) != 1:
+        raise _arity_error("base64_decode", "1 argument", len(args))
+    try:
+        # binascii.Error (what b64decode actually raises) is a ValueError
+        # subclass, so this catches both malformed padding/alphabet issues.
+        raw = base64.b64decode(str(args[0]), validate=False)
+    except ValueError as exc:
+        raise ValueError(f"base64_decode(): invalid base64 — {exc}") from exc
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            "base64_decode(): decoded bytes aren't valid UTF-8 text "
+            "(NyxScript has no binary/bytes type to hold them otherwise)"
+        ) from exc
+
+
+def _random(args: list[Any]) -> float:
+    if args:
+        raise _arity_error("random", "no arguments", len(args))
+    return random.random()
+
+
 BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "len": _len,
     "range": _range,
@@ -535,6 +567,9 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "to_iso8601": _to_iso8601,
     "sha256": _sha256,
     "md5": _md5,
+    "base64_encode": _base64_encode,
+    "base64_decode": _base64_decode,
+    "random": _random,
     "regex_match": _regex_match,
     "regex_find": _regex_find,
     "regex_find_all": _regex_find_all,
