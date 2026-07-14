@@ -532,6 +532,89 @@ def _random(args: list[Any]) -> float:
     return random.random()
 
 
+# --- byte-level helpers ---------------------------------------------------
+# NyxScript has no bytes type, so binary data crosses the `socket.*`
+# boundary (see sockets.py) as a list of ints 0-255. These are the pure,
+# always-available (no --unsafe needed) conversions for building and
+# parsing binary protocol messages out of that — packing/unpacking
+# integers is network byte order (big-endian), since that's what almost
+# every wire protocol uses.
+
+
+def _bytes_from_hex(args: list[Any]) -> list[int]:
+    if len(args) != 1:
+        raise _arity_error("bytes_from_hex", "1 argument", len(args))
+    text = str(args[0])
+    try:
+        return list(bytes.fromhex(text))
+    except ValueError as exc:
+        raise ValueError(f"bytes_from_hex(): invalid hex string — {exc}") from exc
+
+
+def _bytes_to_hex(args: list[Any]) -> str:
+    if len(args) != 1:
+        raise _arity_error("bytes_to_hex", "1 argument (a list of byte values)", len(args))
+    if not isinstance(args[0], list):
+        raise TypeError(f"bytes_to_hex() expects a list, got {type(args[0]).__name__}")
+    try:
+        return bytes(int(b) for b in args[0]).hex()
+    except (TypeError, ValueError) as exc:
+        raise ValueError("bytes_to_hex(): list must contain integers 0-255") from exc
+
+
+def _bytes_from_string(args: list[Any]) -> list[int]:
+    if len(args) != 1:
+        raise _arity_error("bytes_from_string", "1 argument", len(args))
+    return list(str(args[0]).encode("utf-8"))
+
+
+def _bytes_to_string(args: list[Any]) -> str:
+    if len(args) != 1:
+        raise _arity_error("bytes_to_string", "1 argument (a list of byte values)", len(args))
+    if not isinstance(args[0], list):
+        raise TypeError(f"bytes_to_string() expects a list, got {type(args[0]).__name__}")
+    try:
+        return bytes(int(b) for b in args[0]).decode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"bytes_to_string(): {exc}") from exc
+
+
+def _pack_uint(width: int, name: str, args: list[Any]) -> list[int]:
+    if len(args) != 1:
+        raise _arity_error(name, "1 argument", len(args))
+    n = int(args[0])
+    if not (0 <= n < 2 ** (width * 8)):
+        raise ValueError(f"{name}(): {n} doesn't fit in an unsigned {width * 8}-bit integer")
+    return list(n.to_bytes(width, byteorder="big"))
+
+
+def _unpack_uint(width: int, name: str, args: list[Any]) -> int:
+    if len(args) != 1:
+        raise _arity_error(name, "1 argument (a list of byte values)", len(args))
+    if not isinstance(args[0], list) or len(args[0]) != width:
+        raise ValueError(f"{name}() expects a list of exactly {width} byte values")
+    try:
+        return int.from_bytes(bytes(int(b) for b in args[0]), byteorder="big")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name}(): list must contain integers 0-255") from exc
+
+
+def _pack_uint16(args: list[Any]) -> list[int]:
+    return _pack_uint(2, "pack_uint16", args)
+
+
+def _pack_uint32(args: list[Any]) -> list[int]:
+    return _pack_uint(4, "pack_uint32", args)
+
+
+def _unpack_uint16(args: list[Any]) -> int:
+    return _unpack_uint(2, "unpack_uint16", args)
+
+
+def _unpack_uint32(args: list[Any]) -> int:
+    return _unpack_uint(4, "unpack_uint32", args)
+
+
 BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "len": _len,
     "range": _range,
@@ -570,6 +653,14 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "base64_encode": _base64_encode,
     "base64_decode": _base64_decode,
     "random": _random,
+    "bytes_from_hex": _bytes_from_hex,
+    "bytes_to_hex": _bytes_to_hex,
+    "bytes_from_string": _bytes_from_string,
+    "bytes_to_string": _bytes_to_string,
+    "pack_uint16": _pack_uint16,
+    "pack_uint32": _pack_uint32,
+    "unpack_uint16": _unpack_uint16,
+    "unpack_uint32": _unpack_uint32,
     "regex_match": _regex_match,
     "regex_find": _regex_find,
     "regex_find_all": _regex_find_all,

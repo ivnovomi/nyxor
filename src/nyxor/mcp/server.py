@@ -125,14 +125,16 @@ async def run_nyxscript(source: str) -> str:
     """Lint, then run, a NyxScript source string and return its printed output.
 
     Runs with the same safety default as everywhere else in NYXOR:
-    ``python:``/``pip`` blocks are disabled (this tool never passes
-    ``--unsafe``), so a script can only do what NyxScript's own sandboxed
-    grammar allows — no arbitrary code execution reachable from an MCP call.
-    ``allow_unsafe_directive=False`` closes the one gap that would otherwise
-    leave: a script's own ``unsafe`` statement (see the language guide)
-    flips this on for anyone running it locally, but that same statement is
-    refused outright here — `unsafe=False` on this path is a hard ceiling,
-    not just a starting value a submitted script could raise itself.
+    ``python:``/``pip``/``socket.*`` are all disabled (this tool never
+    passes ``--unsafe``), so a script can only do what NyxScript's own
+    sandboxed grammar and audited scan modules allow — no arbitrary code
+    execution and no arbitrary-host network access reachable from an MCP
+    call. ``allow_unsafe_directive=False`` closes the one gap that would
+    otherwise leave: a script's own ``unsafe`` statement (see the language
+    guide) flips all three on for anyone running it locally, but that same
+    statement is refused outright here — `unsafe=False` on this path is a
+    hard ceiling, not just a starting value a submitted script could raise
+    itself.
     """
     issues = lint_source(source)
     errors = [issue for issue in issues if issue.severity == "error"]

@@ -70,6 +70,7 @@ from nyxor.core.scripting.ast_nodes import (
 from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS, HIGHER_ORDER_FUNCTIONS, format_value
 from nyxor.core.scripting.errors import RuntimeScriptError, ScriptError
 from nyxor.core.scripting.parser import parse, parse_expression
+from nyxor.core.scripting.sockets import SOCKET_FUNCTIONS, ScriptSocket
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
 from nyxor.core.scripting.ui import UI_FUNCTIONS, ScriptUI
 
@@ -204,6 +205,7 @@ class Interpreter:
         # supposed to withhold.
         self._allow_unsafe_directive = allow_unsafe_directive
         self.ui = ui or ScriptUI()
+        self.socket = ScriptSocket()
         self._env_stack: list[dict[str, Any]] = [{}]
         self.call_stack: list[dict[str, Any]] = []
         self._importing: set[Path] = set()
@@ -418,6 +420,15 @@ class Interpreter:
                 try:
                     return await getattr(self.ui, member)(args)
                 except TypeError as exc:
+                    raise RuntimeScriptError(str(exc), line=call.line) from exc
+
+            if module_name == "socket":
+                self._require_unsafe("socket", call.line)
+                if member not in SOCKET_FUNCTIONS:
+                    raise RuntimeScriptError(f"unknown function 'socket.{member}'", line=call.line)
+                try:
+                    return await getattr(self.socket, member)(args)
+                except (TypeError, ValueError, OSError) as exc:
                     raise RuntimeScriptError(str(exc), line=call.line) from exc
 
             module_value = self._lookup_optional(module_name)
@@ -733,8 +744,10 @@ class Interpreter:
     def _require_unsafe(self, feature: str, line: int) -> None:
         if not self.unsafe:
             raise RuntimeScriptError(
-                f"'{feature}' is disabled by default (it runs arbitrary code / installs "
-                f"packages). Re-run with --unsafe (CLI) or enable the Unsafe toggle (TUI).",
+                f"'{feature}' is disabled by default (it runs arbitrary code, installs "
+                "packages, or reaches arbitrary network hosts/ports outside NYXOR's audited "
+                "scan modules). Re-run with --unsafe (CLI), enable the Unsafe toggle (TUI), "
+                "or add an 'unsafe' statement to the script itself.",
                 line=line,
             )
 
@@ -796,13 +809,26 @@ async def run_script(
     allow_unsafe_directive: bool = True,
     ui: ScriptUI | None = None,
 ) -> None:
-    """Parse and execute a NyxScript source string end to end."""
+    """Parse and execute a NyxScript source string end to end.
+
+    Closes any `socket.*` connections still open when the script finishes
+    (success or error) — this is the one-shot entry point (`nyx script
+    run`, the TUI's Run button, `run_nyxscript`), so nothing after this
+    call could still want them open. The REPL, which reuses one
+    `Interpreter` across many separate `run()` calls (one per line), calls
+    `Interpreter.run()` directly instead and is responsible for its own
+    connections staying open across lines on purpose.
+    """
     program = parse(source)
-    await Interpreter(
+    interpreter = Interpreter(
         config,
         output=output,
         base_dir=base_dir,
         unsafe=unsafe,
         allow_unsafe_directive=allow_unsafe_directive,
         ui=ui,
-    ).run(program)
+    )
+    try:
+        await interpreter.run(program)
+    finally:
+        await interpreter.socket.close_all()

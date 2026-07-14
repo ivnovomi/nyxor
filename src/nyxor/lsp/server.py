@@ -24,6 +24,7 @@ from pygls.workspace import TextDocument
 from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
 from nyxor.core.scripting.lexer import KEYWORDS
 from nyxor.core.scripting.linter import LintIssue, lint_source
+from nyxor.core.scripting.sockets import SOCKET_FUNCTIONS
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
 from nyxor.core.scripting.ui import UI_FUNCTIONS
 from nyxor.lsp.analysis import (
@@ -91,6 +92,14 @@ _BUILTIN_DOCS = {
     "base64_encode": "`base64_encode(s)` — base64-encodes s (UTF-8 encoded first).",
     "base64_decode": "`base64_decode(s)` — decodes base64 s back to a UTF-8 string.",
     "random": "`random()` — a random float in [0.0, 1.0).",
+    "bytes_from_hex": "`bytes_from_hex(s)` — hex string to a list of byte values (0-255).",
+    "bytes_to_hex": "`bytes_to_hex(list)` — a list of byte values to a hex string.",
+    "bytes_from_string": "`bytes_from_string(s)` — UTF-8 encodes s to a list of byte values.",
+    "bytes_to_string": "`bytes_to_string(list)` — decodes a list of byte values as UTF-8.",
+    "pack_uint16": "`pack_uint16(n)` — n as 2 big-endian bytes (a list).",
+    "pack_uint32": "`pack_uint32(n)` — n as 4 big-endian bytes (a list).",
+    "unpack_uint16": "`unpack_uint16(list)` — 2 big-endian bytes back to an int.",
+    "unpack_uint32": "`unpack_uint32(list)` — 4 big-endian bytes back to an int.",
 }
 
 _UI_DOCS = {
@@ -100,6 +109,17 @@ _UI_DOCS = {
     "ui.table": "`ui.table(headers, rows)` — print a table.",
     "ui.banner": '`ui.banner("text")` — print a rule with a heading.',
     "ui.status": '`ui.status("message")` — print a status line.',
+}
+
+_SOCKET_DOCS = {
+    "socket.connect": '`socket.connect(host, port[, protocol][, timeout])` — opens a TCP/UDP '
+    "connection, returns a handle. Requires --unsafe.",
+    "socket.send": "`socket.send(handle, data)` — sends a string or list of byte values.",
+    "socket.recv": "`socket.recv(handle[, max_bytes][, timeout])` — reads bytes as a list "
+    "of ints.",
+    "socket.recv_text": "`socket.recv_text(handle[, max_bytes][, timeout])` — reads bytes "
+    "as UTF-8.",
+    "socket.close": "`socket.close(handle)` — closes the connection.",
 }
 
 _MODULE_DOCS = {
@@ -245,8 +265,9 @@ def _module_member_completions(
 
     library, resolved the same way hover/go-to-definition already do (an
     editor typing `asset.` should see `by_kind`, `kinds`, etc., not the
-    generic keyword/builtin soup). Returns None when `alias` isn't `ui` or
-    a known import in this document, so the caller can fall back sanely.
+    generic keyword/builtin soup). Returns None when `alias` isn't `ui`,
+    `socket`, or a known import in this document, so the caller can fall
+    back sanely.
     """
     if alias == "ui":
         return types.CompletionList(
@@ -258,6 +279,18 @@ def _module_member_completions(
                     detail=_UI_DOCS.get(f"ui.{name}", ""),
                 )
                 for name in sorted(UI_FUNCTIONS)
+            ],
+        )
+    if alias == "socket":
+        return types.CompletionList(
+            is_incomplete=False,
+            items=[
+                types.CompletionItem(
+                    label=name,
+                    kind=types.CompletionItemKind.Function,
+                    detail=_SOCKET_DOCS.get(f"socket.{name}", ""),
+                )
+                for name in sorted(SOCKET_FUNCTIONS)
             ],
         )
 
@@ -344,6 +377,14 @@ def completions(ls: LanguageServer, params: types.CompletionParams) -> types.Com
         for name in sorted(UI_FUNCTIONS)
     ]
     items += [
+        types.CompletionItem(
+            label=f"socket.{name}",
+            kind=types.CompletionItemKind.Function,
+            detail=_SOCKET_DOCS.get(f"socket.{name}", ""),
+        )
+        for name in sorted(SOCKET_FUNCTIONS)
+    ]
+    items += [
         types.CompletionItem(label=name, kind=types.CompletionItemKind.Variable)
         for name in variables
     ]
@@ -371,6 +412,7 @@ def hover(ls: LanguageServer, params: types.HoverParams) -> types.Hover | None:
         _ACTION_DOCS.get(word)
         or _BUILTIN_DOCS.get(word)
         or _UI_DOCS.get(word)
+        or _SOCKET_DOCS.get(word)
         or (f"NYXOR module: {_MODULE_DOCS[word]}" if word in _MODULE_DOCS else None)
     )
     if doc_text is None:

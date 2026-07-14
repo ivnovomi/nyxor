@@ -26,6 +26,7 @@ from textual.widgets.text_area import TextAreaTheme
 
 from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS
 from nyxor.core.scripting.lexer import KEYWORDS, tokenize
+from nyxor.core.scripting.sockets import SOCKET_FUNCTIONS
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
 from nyxor.core.scripting.ui import UI_FUNCTIONS
 from nyxor.lsp.analysis import (
@@ -144,6 +145,7 @@ def _highlight_line(text: str) -> list[tuple[int, int | None, str]]:
                 token.value in MODULE_RUNNERS
                 or token.value in BUILTIN_FUNCTIONS
                 or (token.value.startswith("ui.") and token.value[3:] in UI_FUNCTIONS)
+                or (token.value.startswith("socket.") and token.value[7:] in SOCKET_FUNCTIONS)
             ):
                 spans.append((start, start + len(token.value), "module"))
         elif token.type in ("=", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/"):
@@ -206,6 +208,7 @@ class NyxScriptEditor(TextArea):
         | set(MODULE_RUNNERS)
         | set(BUILTIN_FUNCTIONS)
         | {f"ui.{name}" for name in UI_FUNCTIONS}
+        | {f"socket.{name}" for name in SOCKET_FUNCTIONS}
     )
 
     def on_mount(self) -> None:
@@ -352,6 +355,8 @@ class NyxScriptEditor(TextArea):
         alias = prefix.rpartition(".")[0] if "." in prefix else ""
         if alias == "ui":
             candidates = [f"ui.{name}" for name in sorted(UI_FUNCTIONS)]
+        elif alias == "socket":
+            candidates = [f"socket.{name}" for name in sorted(SOCKET_FUNCTIONS)]
         elif alias and alias in (imported := self._imported_functions()):
             candidates = [f"{alias}.{name}" for name in imported[alias]]
         else:

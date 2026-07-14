@@ -62,6 +62,7 @@ from nyxor.core.scripting.ast_nodes import (
 from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS, HIGHER_ORDER_FUNCTIONS
 from nyxor.core.scripting.errors import ScriptError
 from nyxor.core.scripting.parser import parse, parse_expression
+from nyxor.core.scripting.sockets import SOCKET_FUNCTIONS
 from nyxor.core.scripting.stdlib import MODULE_RUNNERS
 from nyxor.core.scripting.ui import UI_FUNCTIONS
 
@@ -142,6 +143,26 @@ def _check_call(
                 issues.append(
                     LintIssue(
                         "error", call.line, f"unknown function 'ui.{member}'. Options: {options}"
+                    )
+                )
+            return
+        if module_name == "socket":
+            if member not in SOCKET_FUNCTIONS:
+                options = ", ".join(sorted(SOCKET_FUNCTIONS))
+                issues.append(
+                    LintIssue(
+                        "error",
+                        call.line,
+                        f"unknown function 'socket.{member}'. Options: {options}",
+                    )
+                )
+            else:
+                issues.append(
+                    LintIssue(
+                        "warning",
+                        call.line,
+                        f"'socket.{member}' reaches an arbitrary network host/port outside "
+                        "NYXOR's audited scan modules; requires --unsafe to run",
                     )
                 )
             return
