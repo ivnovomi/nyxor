@@ -42,7 +42,7 @@ if target != "":
 end
 ```
 
-**Types**: string (`"..."`/`'...'`, with `\n \t \\ \" \'` escapes and
+**Types**: string (`"..."`/`'...'`, with `\n \t \r \\ \" \'` escapes and
 `{expr}` interpolation), number (`int`/`float`), `true`/`false`, list
 (`[1, 2, 3]`, heterogeneous, indexable), dict (`{"a": 1, "b": 2}`,
 indexable, string/number/bool keys). No `null` — an unset variable is a
@@ -249,7 +249,11 @@ attaches to its result), `hash.nyx` (`short_hash`, `fingerprint`,
 already repeats a string, so there's no separate `repeat()`),
 `table.nyx` (`render(headers, rows)` — an aligned plain-text table as a
 string, for `print`/`save`; distinct from the interactive `ui.table`,
-which needs a live terminal).
+which needs a live terminal), `ftp.nyx` (`connect`, `login`/
+`anonymous_login`, `pwd`, `cwd`, `set_binary_mode`/`set_ascii_mode`,
+`list`, `retr`, `quit` — a minimal read-oriented FTP client built on
+`socket.*`, requires `--unsafe` transitively; connection objects are
+plain dicts, pass the same one into every call).
 Reach for these before reimplementing — e.g. don't hand-roll a dict merge
 when `dict.merge(a, b)` already exists, or a retry loop when
 `time.backoff_delay` already does exponential backoff.

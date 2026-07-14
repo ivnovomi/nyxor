@@ -1,0 +1,175 @@
+# A minimal, read-oriented FTP client, built entirely on socket.* — no
+# new builtins needed, same pattern as csv.nyx being built on top of
+# string primitives. Requires --unsafe transitively (every function here
+# calls socket.* under the hood).
+#
+# Deliberately read-only: connect/login/pwd/cwd/list/retr, no STOR/DELE/
+# MKD/RMD. NYXOR's own scan modules are passive observations; a script
+# using this to *modify* a remote server is a much bigger step than one
+# using it to check what an anonymous FTP server exposes — if you need
+# to write to a server, `socket.send` directly gives you the same
+# control connection this module does (a connection dict's "handle").
+
+func connect(host, port):
+    "Opens the control connection to an FTP server. Returns a connection object."
+    set h = socket.connect(host, port, "tcp", 10.0)
+    set conn = {"handle": h, "host": host, "buffer": ""}
+    set greeting = _read_response(conn)
+    set conn["code"] = greeting[0]
+    set conn["message"] = greeting[1]
+    return conn
+end
+
+func login(conn, username, password):
+    "Logs in with username/password. Returns [code, message] from the final response."
+    set r1 = _send_command(conn, "USER " + username)
+    if r1[0] == "230":
+        return r1
+    end
+    return _send_command(conn, "PASS " + password)
+end
+
+func anonymous_login(conn):
+    "Convenience for login(conn, \"anonymous\", \"anonymous@\")."
+    return login(conn, "anonymous", "anonymous@")
+end
+
+func pwd(conn):
+    "The current working directory on the server."
+    set r = _send_command(conn, "PWD")
+    return r[1]
+end
+
+func cwd(conn, path):
+    "Changes the working directory. Returns [code, message]."
+    return _send_command(conn, "CWD " + path)
+end
+
+func set_binary_mode(conn):
+    "TYPE I — for downloading files as-is (not translating line endings)."
+    return _send_command(conn, "TYPE I")
+end
+
+func set_ascii_mode(conn):
+    "TYPE A — the default on most servers; fine for text files/listings."
+    return _send_command(conn, "TYPE A")
+end
+
+func list(conn, path):
+    "Lists a directory (path \"\" for the current one). Returns the raw listing text."
+    set data_target = _enter_passive(conn)
+    set data_h = socket.connect(data_target[0], data_target[1], "tcp", 10.0)
+
+    set command = "LIST"
+    if len(path) > 0:
+        set command = "LIST " + path
+    end
+    set r = _send_command(conn, command)
+    if r[0] != "150" and r[0] != "125":
+        socket.close(data_h)
+        fail "ftp: LIST failed: " + r[1]
+    end
+
+    set out = _read_all(data_h, 30.0)
+    socket.close(data_h)
+    _read_response(conn)
+    return out
+end
+
+func retr(conn, remote_path):
+    "Downloads a remote file's content as UTF-8 text (use set_binary_mode first for non-text files, and socket.recv-based reading if you need raw bytes)."
+    set data_target = _enter_passive(conn)
+    set data_h = socket.connect(data_target[0], data_target[1], "tcp", 10.0)
+
+    set r = _send_command(conn, "RETR " + remote_path)
+    if r[0] != "150" and r[0] != "125":
+        socket.close(data_h)
+        fail "ftp: RETR failed: " + r[1]
+    end
+
+    set out = _read_all(data_h, 30.0)
+    socket.close(data_h)
+    _read_response(conn)
+    return out
+end
+
+func quit(conn):
+    "Sends QUIT and closes the control connection."
+    try:
+        socket.send(conn["handle"], "QUIT\r\n")
+    except err:
+        sleep 0  # best-effort: the control connection may already be dead
+    end
+    socket.close(conn["handle"])
+end
+
+# --- internals -------------------------------------------------------------
+
+func _send_command(conn, command):
+    socket.send(conn["handle"], command + "\r\n")
+    return _read_response(conn)
+end
+
+func _read_response(conn):
+    "Reads exactly one (possibly multi-line) FTP response, consuming only that response's bytes off the control connection — anything read past it stays in conn[\"buffer\"] for the next call. Returns [code, text]."
+    set code = ""
+    set text = ""
+    while true:
+        set nl = find(conn["buffer"], "\n")
+        if nl < 0:
+            set chunk = socket.recv_text(conn["handle"], 4096, 10.0)
+            if len(chunk) == 0:
+                fail "ftp: connection closed or timed out while reading a response"
+            end
+            set conn["buffer"] = conn["buffer"] + chunk
+        else:
+            set line = strip(conn["buffer"][0:nl])
+            set conn["buffer"] = conn["buffer"][nl + 1:len(conn["buffer"])]
+            if len(text) > 0:
+                set text = text + "\n"
+            end
+            set text = text + line
+            if len(code) == 0:
+                if len(line) < 4 or not regex_match(line, r"^\d{3}[ -]"):
+                    fail "ftp: unexpected response line: " + line
+                end
+                set code = line[0:3]
+                if line[3:4] == " ":
+                    return [code, text]
+                end
+            else:
+                if len(line) >= 4 and line[0:3] == code and line[3:4] == " ":
+                    return [code, text]
+                end
+            end
+        end
+    end
+end
+
+func _enter_passive(conn):
+    "Sends PASV, parses the (host, port) it hands back for the data connection."
+    set r = _send_command(conn, "PASV")
+    if r[0] != "227":
+        fail "ftp: PASV failed: " + r[1]
+    end
+    set nums = regex_find_all(r[1], r"\d+")
+    if len(nums) < 6:
+        fail "ftp: could not parse PASV response: " + r[1]
+    end
+    set n = len(nums)
+    set octets = [nums[n - 6], nums[n - 5], nums[n - 4], nums[n - 3]]
+    set host = join(octets, ".")
+    set port = int(nums[n - 2]) * 256 + int(nums[n - 1])
+    return [host, port]
+end
+
+func _read_all(h, timeout):
+    "Reads from a data connection until the server closes it (empty read)."
+    set out = ""
+    set chunk = socket.recv_text(h, 65536, timeout)
+    while len(chunk) > 0:
+        set out = out + chunk
+        set chunk = socket.recv_text(h, 65536, timeout)
+    end
+    return out
+end

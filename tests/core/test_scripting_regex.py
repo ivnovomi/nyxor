@@ -28,6 +28,15 @@ print regex_match("42", "\d+")
     assert lines == ["true", "true"]
 
 
+async def test_carriage_return_escape_produces_an_actual_cr() -> None:
+    # Regression: \r was missing from the lexer's escape table entirely, so
+    # "\r\n" silently became the two literal characters "\" + "r" followed
+    # by a real newline instead of CR LF — breaking every line-oriented
+    # network protocol (FTP, SMTP, HTTP/1.x...) that needs CRLF framing.
+    lines = await _run(r'print len("a\r\nb")' + "\n")
+    assert lines == ["4"]  # "a", CR, LF, "b" — not "a", "\", "r", "\", "n", "b"
+
+
 async def test_regex_match_true_and_false() -> None:
     lines = await _run(
         """

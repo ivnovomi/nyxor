@@ -50,7 +50,7 @@ KEYWORDS = frozenset(
 
 _TWO_CHAR_OPS = {"==": "==", "!=": "!=", "<=": "<=", ">=": ">="}
 _ONE_CHAR_OPS = set("=<>+-*/:()[]{},.")
-_ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'"}
+_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"', "'": "'"}
 
 
 @dataclass(frozen=True)

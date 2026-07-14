@@ -361,6 +361,45 @@ actual network I/O (that's what `run dns`/`run tls`/`run http` are for).
 | `octets` | `(s)` | Dotted-quad IPv4 string → list of 4 ints (assumes already validated) |
 | `is_private_ipv4` | `(s)` | True if `s` is private/loopback/link-local (RFC 1918 + friends; precise about the 172.16.0.0/12 second-octet range) |
 
+### `lib/ftp.nyx`
+
+A minimal, read-oriented FTP client built entirely on `socket.*` — no new
+builtins needed. Requires `--unsafe` transitively, since every function
+here calls `socket.*` under the hood. Deliberately read-only: `connect`/
+`login`/`pwd`/`cwd`/`list`/`retr`, no `STOR`/`DELE`/`MKD`/`RMD` — if you
+need to write to a server, `socket.send` directly against the connection
+object's `"handle"` gives you the same control connection this module
+does.
+
+Connection objects returned by `connect()` are plain dicts
+(`"handle"`, `"host"`, `"code"`, `"message"`, plus an internal
+`"buffer"` field the response reader uses) — pass the same object into
+every subsequent call.
+
+| Function | Params | Description |
+|---|---|---|
+| `connect` | `(host, port)` | Opens the control connection; returns a connection object |
+| `login` | `(conn, username, password)` | `USER`/`PASS`; returns `[code, message]` from the final response |
+| `anonymous_login` | `(conn)` | `login(conn, "anonymous", "anonymous@")` |
+| `pwd` | `(conn)` | The current working directory, as reported by `PWD` |
+| `cwd` | `(conn, path)` | Changes directory; returns `[code, message]` |
+| `set_binary_mode` | `(conn)` | `TYPE I` — for downloading files as-is |
+| `set_ascii_mode` | `(conn)` | `TYPE A` — the default on most servers |
+| `list` | `(conn, path)` | `PASV` + `LIST`; returns the raw directory listing text |
+| `retr` | `(conn, remote_path)` | `PASV` + `RETR`; returns the file's content as UTF-8 text |
+| `quit` | `(conn)` | Sends `QUIT` and closes the control connection |
+
+The response reader keeps a per-connection leftover buffer
+(`conn["buffer"]`) rather than assuming one `socket.recv_text` call maps
+to exactly one FTP response — a real server can (and, tested against a
+local mock server during development, reliably does) flush a `150`
+reply and the following `226 Transfer complete` in the same TCP segment
+when the data connection was already open before the command was sent.
+Treating "the last `\d{3} ` line in whatever came back" as the answer
+silently returns the wrong response in that case; the fix parses one
+line at a time and stops at the first complete response, stashing
+anything read past it for the next call.
+
 ### `lib/asset.nyx`
 
 Helpers over the `Asset` lists a module like `network.discover` attaches
