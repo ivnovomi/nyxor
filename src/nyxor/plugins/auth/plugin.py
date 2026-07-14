@@ -123,6 +123,13 @@ def approve(
         context.console.print(_connect_hint(host))
         raise typer.Exit(code=1) from None
 
+    if resp.status_code == 403:
+        context.console.print(
+            "[red]Couldn't approve:[/red] the API only accepts device-flow approval from "
+            "localhost. If it's running on another host, approve over an SSH tunnel or from "
+            "a shell on that host."
+        )
+        raise typer.Exit(code=1)
     if resp.status_code != 200:
         detail = resp.json().get("detail", resp.text)
         context.console.print(f"[red]Couldn't approve:[/red] {detail}")

@@ -12,6 +12,12 @@ from nyxor.plugins.http_.fingerprint import fingerprint
 
 ValidateUrl = Callable[[str], Awaitable[None]]
 
+# Header/security-header checks and tech fingerprinting need at most a few KB
+# of body (meta tags, generator strings, ...) — capping how much of the
+# response we buffer keeps a target that streams an unbounded/huge response
+# (deliberately or not) from being able to exhaust this process's memory.
+MAX_BODY_BYTES = 2 * 1024 * 1024
+
 SECURITY_HEADERS = (
     "strict-transport-security",
     "content-security-policy",
@@ -30,6 +36,23 @@ def _describe_cookie(cookie: Any) -> dict[str, Any]:
         "http_only": "httponly" in rest,
         "same_site": rest.get("samesite"),
     }
+
+
+async def _read_capped_body(response: httpx.Response) -> bytes:
+    """Read at most MAX_BODY_BYTES of the response body, then stop.
+
+    A malicious or misconfigured target can stream an arbitrarily large
+    (even infinite) body; without a cap, buffering it all would let a single
+    scanned target exhaust this process's memory.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes():
+        chunks.append(chunk)
+        total += len(chunk)
+        if total >= MAX_BODY_BYTES:
+            break
+    return b"".join(chunks)
 
 
 async def inspect(
@@ -53,21 +76,27 @@ async def inspect(
         timeout=timeout, follow_redirects=False, max_redirects=max_redirects, verify=True
     ) as client:
         current_url = url
-        response: httpx.Response | None = None
+        response: httpx.Response
+        body = b""
         for _ in range(max_redirects + 1):
             if validate_url is not None:
                 await validate_url(current_url)
-            response = await client.get(current_url)
-            if follow_redirects and response.is_redirect:
-                location = response.headers.get("location", "")
-                redirect_chain.append(
-                    {"url": current_url, "status_code": response.status_code, "location": location}
-                )
-                current_url = str(response.next_request.url) if response.next_request else location
-                continue
+            async with client.stream("GET", current_url) as response:
+                if follow_redirects and response.is_redirect:
+                    location = response.headers.get("location", "")
+                    redirect_chain.append(
+                        {
+                            "url": current_url,
+                            "status_code": response.status_code,
+                            "location": location,
+                        }
+                    )
+                    current_url = (
+                        str(response.next_request.url) if response.next_request else location
+                    )
+                    continue
+                body = await _read_capped_body(response)
             break
-
-        assert response is not None
 
     headers = dict(response.headers)
     lower_headers = {k.lower(): v for k, v in headers.items()}
@@ -76,15 +105,13 @@ async def inspect(
 
     missing_security_headers = [h for h in SECURITY_HEADERS if h not in lower_headers]
 
-    # `response.text` is already fully buffered in memory (a plain client.get(),
-    # not a stream) — reading it here for signature matching costs no extra
-    # request. Only the derived tech/CDN names go into the result; the raw
-    # body itself is never kept, so it can't bloat a JSON/HTML report.
+    # Only the derived tech/CDN names go into the result; the raw body itself
+    # is never kept, so it can't bloat a JSON/HTML report.
     try:
-        body = response.text
-    except Exception:  # undecodable body (binary response, bad charset, ...)
-        body = ""
-    fingerprint_result = fingerprint(headers, cookies, body)
+        text = body.decode(response.encoding or "utf-8", errors="replace")
+    except (LookupError, UnicodeDecodeError):
+        text = body.decode("utf-8", errors="replace")
+    fingerprint_result = fingerprint(headers, cookies, text)
 
     return {
         "final_url": str(response.url),

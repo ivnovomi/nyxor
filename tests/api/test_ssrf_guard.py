@@ -46,6 +46,15 @@ def test_audit_endpoint_rejects_private_ip_literal(nyxor_test_client) -> None:
     assert resp.status_code == 400
 
 
+def test_audit_endpoint_rejects_cgnat_shared_address_space(nyxor_test_client) -> None:
+    # 100.64.0.0/10 (RFC 6598) is neither is_private nor is_global in Python's
+    # ipaddress module — it routes to cloud-internal infra (AWS ENIs, etc.)
+    # and must still be blocked.
+    resp = nyxor_test_client.get("/dns/100.64.0.1")
+    assert resp.status_code == 400
+    assert "non-public" in resp.json()["detail"]
+
+
 def test_http_endpoint_rejects_a_redirect_to_a_metadata_ip(nyxor_test_client, monkeypatch) -> None:
     # The initial URL is public and passes _ensure_public_target, but the
     # server it points at 302s to the cloud metadata address — the SSRF
@@ -53,16 +62,28 @@ def test_http_endpoint_rejects_a_redirect_to_a_metadata_ip(nyxor_test_client, mo
     # caller typed in.
     import httpx
 
-    async def fake_get(self, url, **kwargs):  # noqa: ANN001
+    class _FakeStream:
+        def __init__(self, response: httpx.Response) -> None:
+            self._response = response
+
+        async def __aenter__(self) -> httpx.Response:
+            return self._response
+
+        async def __aexit__(self, *exc_info: object) -> None:
+            return None
+
+    def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
         if "169.254.169.254" in str(url):
-            return httpx.Response(200, request=httpx.Request("GET", url))
-        return httpx.Response(
-            302,
-            headers={"location": "http://169.254.169.254/latest/meta-data/"},
-            request=httpx.Request("GET", url),
+            return _FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
+        return _FakeStream(
+            httpx.Response(
+                302,
+                headers={"location": "http://169.254.169.254/latest/meta-data/"},
+                request=httpx.Request(method, url),
+            )
         )
 
-    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+    monkeypatch.setattr(httpx.AsyncClient, "stream", fake_stream)
 
     resp = nyxor_test_client.get("/http", params={"url": "https://public-redirector.example"})
 

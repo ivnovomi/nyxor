@@ -30,8 +30,17 @@ async def crtsh_subdomains(domain: str, timeout: float = 15.0) -> set[str]:
     except (httpx.HTTPError, ValueError):
         return set()
 
+    # crt.sh (or a proxy/CDN in front of it) can return well-formed JSON
+    # that isn't the expected list of certificate entries — e.g. a rate-limit
+    # or maintenance response like {"error": "..."}. That's still a "having
+    # a bad day" case this function promises never to raise for.
+    if not isinstance(entries, list):
+        return set()
+
     names: set[str] = set()
     for entry in entries:
+        if not isinstance(entry, dict):
+            continue
         raw = entry.get("name_value", "")
         for name in raw.splitlines():
             name = name.strip().lower()

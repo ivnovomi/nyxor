@@ -75,6 +75,51 @@ async def test_completion_follows_an_imported_library_alias() -> None:
 
 
 @pytest.mark.asyncio
+async def test_imported_functions_are_cached_and_reloaded_on_change() -> None:
+    # completion_context() runs on every keystroke — imported libraries must
+    # not be re-read and re-parsed from disk every time unless they actually
+    # changed on disk (mtime), or an editor with imports would do disk I/O
+    # per character typed.
+    import time
+
+    app = NyxorApp()
+    async with app.run_test():
+        lib_dir = Path.cwd() / "lib"
+        lib_dir.mkdir(exist_ok=True)
+        demo = lib_dir / "demo.nyx"
+        demo.write_text("func square(x):\n    return x * x\nend\n", encoding="utf-8")
+
+        editor = app.query_one("#script-editor", NyxScriptEditor)
+        editor.text = 'import "lib/demo.nyx" as demo\n\ndemo.'
+        editor.move_cursor((2, len("demo.")))
+
+        _prefix, matches = editor.completion_context()
+        assert "demo.square" in matches
+        assert "demo.cube" not in matches
+
+        cache = editor._import_fn_cache
+        assert len(cache) == 1
+        cached_mtime, _fns = next(iter(cache.values()))
+
+        # Calling it again without touching the file must hit the cache
+        # (same cached mtime/entry, not a fresh read+parse).
+        editor.completion_context()
+        assert next(iter(cache.values()))[0] == cached_mtime
+
+        # Ensure the mtime actually advances on this filesystem, then modify
+        # the file — the new function must show up, proving the cache
+        # invalidates rather than sticking forever.
+        time.sleep(0.01)
+        demo.write_text(
+            "func square(x):\n    return x * x\nend\nfunc cube(x):\n    return x * x * x\nend\n",
+            encoding="utf-8",
+        )
+
+        _prefix, matches = editor.completion_context()
+        assert "demo.cube" in matches
+
+
+@pytest.mark.asyncio
 async def test_completion_after_ui_dot_lists_ui_functions() -> None:
     app = NyxorApp()
     async with app.run_test():

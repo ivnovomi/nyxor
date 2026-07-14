@@ -6,18 +6,19 @@ async-first Core.
 
 from __future__ import annotations
 
+import asyncio
+
 import dns.asyncresolver
 import dns.exception
-import dns.resolver
 
 DEFAULT_RECORD_TYPES: tuple[str, ...] = ("A", "AAAA", "MX", "TXT", "NS", "CNAME", "SOA")
 
-_LOOKUP_EXCEPTIONS = (
-    dns.resolver.NXDOMAIN,
-    dns.resolver.NoAnswer,
-    dns.resolver.NoNameservers,
-    dns.exception.Timeout,
-)
+# dns.exception.DNSException is the common base for every dnspython error —
+# NXDOMAIN/NoAnswer/NoNameservers/Timeout, but also malformed-name errors
+# like dns.name.EmptyLabel/LabelTooLong raised for a bad input domain before
+# any query is even sent. Catching only the first four left those escaping
+# uncaught, crashing the whole audit/watch/trends run over one bad hostname.
+_LOOKUP_EXCEPTIONS = (dns.exception.DNSException,)
 
 
 def _make_resolver(resolvers: list[str], timeout: float) -> dns.asyncresolver.Resolver:
@@ -32,16 +33,21 @@ def _make_resolver(resolvers: list[str], timeout: float) -> dns.asyncresolver.Re
 async def lookup_records(
     domain: str, record_types: tuple[str, ...], resolvers: list[str], timeout: float
 ) -> dict[str, list[str]]:
-    """Resolve each requested record type, returning an empty list on failure."""
+    """Resolve each requested record type concurrently, returning an empty list on failure."""
     resolver = _make_resolver(resolvers, timeout)
-    results: dict[str, list[str]] = {}
-    for rtype in record_types:
+
+    async def _resolve_one(rtype: str) -> list[str]:
         try:
             answer = await resolver.resolve(domain, rtype)
-            results[rtype] = [rdata.to_text() for rdata in answer]
+            return [rdata.to_text() for rdata in answer]
         except _LOOKUP_EXCEPTIONS:
-            results[rtype] = []
-    return results
+            return []
+
+    # Issued in parallel — sequentially, one slow/unresponsive resolver
+    # response per record type could take up to len(record_types) * timeout
+    # instead of ~timeout.
+    values = await asyncio.gather(*(_resolve_one(rtype) for rtype in record_types))
+    return dict(zip(record_types, values, strict=True))
 
 
 async def check_dnssec(domain: str, resolvers: list[str], timeout: float) -> bool:
@@ -59,32 +65,36 @@ async def check_mail_records(
 ) -> dict[str, object]:
     """Look up MX, SPF, and DMARC records — the basics of mail-related posture."""
     resolver = _make_resolver(resolvers, timeout)
-    info: dict[str, object] = {"mx": [], "spf": None, "dmarc": None}
 
-    try:
-        mx_answer = await resolver.resolve(domain, "MX")
-        info["mx"] = sorted(str(rdata.exchange).rstrip(".") for rdata in mx_answer)
-    except _LOOKUP_EXCEPTIONS:
-        pass
+    async def _mx() -> list[str]:
+        try:
+            answer = await resolver.resolve(domain, "MX")
+            return sorted(str(rdata.exchange).rstrip(".") for rdata in answer)
+        except _LOOKUP_EXCEPTIONS:
+            return []
 
-    try:
-        txt_answer = await resolver.resolve(domain, "TXT")
-        for rdata in txt_answer:
-            text = b"".join(rdata.strings).decode("utf-8", "ignore")
-            if text.startswith("v=spf1"):
-                info["spf"] = text
-                break
-    except _LOOKUP_EXCEPTIONS:
-        pass
+    async def _spf() -> str | None:
+        try:
+            answer = await resolver.resolve(domain, "TXT")
+            for rdata in answer:
+                text = b"".join(rdata.strings).decode("utf-8", "ignore")
+                if text.startswith("v=spf1"):
+                    return text
+        except _LOOKUP_EXCEPTIONS:
+            pass
+        return None
 
-    try:
-        dmarc_answer = await resolver.resolve(f"_dmarc.{domain}", "TXT")
-        for rdata in dmarc_answer:
-            text = b"".join(rdata.strings).decode("utf-8", "ignore")
-            if text.startswith("v=DMARC1"):
-                info["dmarc"] = text
-                break
-    except _LOOKUP_EXCEPTIONS:
-        pass
+    async def _dmarc() -> str | None:
+        try:
+            answer = await resolver.resolve(f"_dmarc.{domain}", "TXT")
+            for rdata in answer:
+                text = b"".join(rdata.strings).decode("utf-8", "ignore")
+                if text.startswith("v=DMARC1"):
+                    return text
+        except _LOOKUP_EXCEPTIONS:
+            pass
+        return None
 
-    return info
+    # Three independent lookups, run concurrently instead of one after another.
+    mx, spf, dmarc = await asyncio.gather(_mx(), _spf(), _dmarc())
+    return {"mx": mx, "spf": spf, "dmarc": dmarc}

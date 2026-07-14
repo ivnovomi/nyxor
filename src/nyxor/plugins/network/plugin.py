@@ -17,7 +17,7 @@ from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import Asset, Finding, ModuleResult, Severity
 from nyxor.core.output import emit_results
 from nyxor.plugins.inventory.store import InventoryStore
-from nyxor.plugins.network.discovery import ping_sweep
+from nyxor.plugins.network.discovery import ping_binary_available, ping_sweep
 from nyxor.plugins.network.ports import COMMON_PORTS, grab_banners, scan_ports
 
 network_app = typer.Typer(
@@ -47,9 +47,18 @@ def _expand_targets(target: str) -> list[str]:
 async def run_discover(target: str, config: NetworkConfig) -> ModuleResult:
     """Ping-sweep ``target`` (a host or CIDR range) and return a ModuleResult."""
     hosts = _expand_targets(target)
+    result = ModuleResult(module="network.discover", target=target)
+
+    if not ping_binary_available():
+        result.errors.append(
+            "the 'ping' binary was not found on PATH — host reachability could not be "
+            "checked (this is not the same as every host being unreachable)"
+        )
+        result.raw_data = {"scanned": len(hosts), "reachable": 0}
+        return result
+
     reachable = await ping_sweep(hosts, config.timeout_seconds, config.max_concurrency)
 
-    result = ModuleResult(module="network.discover", target=target)
     assets: list[Asset] = []
     for host, up in reachable.items():
         if not up:

@@ -462,9 +462,13 @@ class NyxorApp(App[None]):
         table.clear()
         assets = self.inventory.list()
         for asset in sorted(assets, key=lambda a: (a.kind, a.identifier)):
+            # asset.identifier can hold target-controlled data (e.g. a DNS
+            # TXT record's raw text) that may contain square brackets —
+            # DataTable.add_row() parses any plain str cell as Rich markup,
+            # so this needs the same escaping as the Scan tab.
             table.add_row(
                 asset.kind,
-                asset.identifier,
+                escape_markup(asset.identifier),
                 asset.source_module or "-",
                 asset.discovered_at.strftime("%Y-%m-%d %H:%M"),
             )
@@ -782,10 +786,19 @@ class NyxorApp(App[None]):
         for result in results:
             prefix = f"[dim]{result.module}[/] " if multi else ""
             for finding in result.findings:
+                # finding.title/description are sourced from the scanned
+                # target (a port, a CVE id, a path, an IPv6 literal, ...)
+                # and can contain square brackets. DataTable.add_row() parses
+                # *any* plain str cell as Rich markup on its own (see
+                # Textual's default_cell_formatter) — not just the one cell
+                # we build via Text.from_markup — so both columns must be
+                # escaped, or unescaped brackets either silently vanish or
+                # raise rich.errors.MarkupError, which isn't caught anywhere
+                # in this handler and would leave the Scan tab stuck mid-run.
                 table.add_row(
                     _severity_text(finding.severity),
-                    Text.from_markup(f"{prefix}{finding.title}"),
-                    finding.description,
+                    Text.from_markup(f"{prefix}{escape_markup(finding.title)}"),
+                    escape_markup(finding.description),
                 )
             total_findings += len(result.findings)
             all_assets.extend(result.assets)

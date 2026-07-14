@@ -81,3 +81,18 @@ def test_poll_too_soon_after_a_previous_poll_raises_slow_down() -> None:
 def test_is_valid_token_rejects_unknown_tokens() -> None:
     store = DeviceAuthStore()
     assert store.is_valid_token("garbage") is False
+
+
+def test_tokens_expire_after_their_ttl() -> None:
+    from nyxor.api import oauth as oauth_module
+
+    store = DeviceAuthStore()
+    auth = store.create()
+    store.approve(auth.user_code)
+    store._by_device_code[auth.device_code].last_poll_at = 0.0
+    token = store.poll(auth.device_code)
+    assert store.is_valid_token(token)
+
+    store._valid_tokens[token] = time.monotonic() - oauth_module.TOKEN_TTL_SECONDS - 1
+
+    assert store.is_valid_token(token) is False
