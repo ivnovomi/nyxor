@@ -141,10 +141,23 @@ hanging or exhausting memory.
 
 `python:` blocks run as real Python with direct read/write access to
 the script's variables; `pip` installs a package into the current
-environment. Both step outside NyxScript's "just makes requests to the
-targets you name" safety model entirely, so both require `--unsafe` —
-treat a script using them like you would any other executable you're
-choosing to run.
+environment; `socket.*` opens a real TCP/UDP connection to whatever
+host:port the script names. All three step outside NyxScript's "just
+makes requests to the targets you name via audited scan modules" safety
+model entirely, so all three require `--unsafe` — treat a script using
+any of them like you would any other executable you're choosing to run.
+
+`socket.*` in particular is a genuine identity shift for the project,
+not just another builtin: `run dns`/`run tls`/`run http`/
+`network.discover`/`network.scan` are each a bounded, passive,
+already-scored observation — a raw socket lets a script speak whatever
+protocol it wants to whatever destination it wants, which NYXOR can't
+describe or bound the meaning of. It's still built with the same care
+as everything else here (every blocking call has an explicit timeout
+via `asyncio.to_thread`, connections a script forgets to close are
+cleaned up automatically at the end of a one-shot run), but the
+capability itself is a deliberate, considered expansion, not something
+that crept in as a side effect of another feature.
 
 A script can also self-enable them with a bare `unsafe` statement
 instead of the caller passing `--unsafe` — see
@@ -158,11 +171,13 @@ you didn't pass `--unsafe` yourself.
 
 Adding the `unsafe` statement surfaced a real gap before it ever
 shipped: `nyx mcp`'s `run_nyxscript` tool hardcodes `unsafe=False`
-specifically so an MCP call can never reach `python:`/`pip` — but that
-flag is only a *starting* value on the interpreter, not a hard ceiling.
-A script submitted through that tool with a bare `unsafe` statement at
-the top would have self-escalated past `unsafe=False` anyway, defeating
-the one guarantee `run_nyxscript`'s own docstring makes.
+specifically so an MCP call can never reach `python:`/`pip`/`socket.*`
+— but that flag is only a *starting* value on the interpreter, not a
+hard ceiling. A script submitted through that tool with a bare `unsafe`
+statement at the top would have self-escalated past `unsafe=False`
+anyway, defeating the one guarantee `run_nyxscript`'s own docstring
+makes — verified directly for `socket.*` too when it shipped, not
+assumed to be covered by the existing fix.
 
 Fixed with a second, independent flag: `allow_unsafe_directive`
 (default `True`, so `nyx script run`/`nyx tui` are unaffected — that's

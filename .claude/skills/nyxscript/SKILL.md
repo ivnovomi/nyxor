@@ -199,6 +199,13 @@ on valid UTF-8 text (no bytes type to hold arbitrary binary otherwise).
 `now()`. `range()`/`*` (sequence repetition) are capped at 1,000,000
 resulting items.
 
+**Byte-level builtins** (pure, no `--unsafe` needed) — NyxScript has no
+bytes type, so binary data is a list of ints 0-255: `bytes_from_hex(s)`,
+`bytes_to_hex(list)`, `bytes_from_string(s)`, `bytes_to_string(list)`,
+`pack_uint16(n)`/`pack_uint32(n)` (→ list, big-endian/network order),
+`unpack_uint16(list)`/`unpack_uint32(list)` (→ int). Use these to build/
+parse messages for `socket.*` below.
+
 **Regex builtins** — `regex_match(text, pattern)`,
 `regex_find(text, pattern, default)`, `regex_find_all(text, pattern)`,
 `regex_replace(text, pattern, replacement)`. Run in a sandboxed worker
@@ -261,14 +268,34 @@ extraction, grouping findings by severity, an interactive triage flow).
 **Diagnostics**: `print EXPR`, `assert EXPR[, "message"]`, `fail
 "message"`, `sleep SECONDS`.
 
-**Escape hatches — `python:` / `pip`**: disabled by default, refuse to
-run without `--unsafe` (CLI) or the MCP `run_nyxscript` tool (which
-*never* enables `--unsafe` — an MCP call can't get arbitrary code
-execution through this path, by design). Don't reach for these unless
-the task genuinely needs a Python library NyxScript has no built-in for;
-prefer the built-ins and scan modules first.
+**Escape hatches — `python:` / `pip` / `socket.*`**: disabled by
+default, refuse to run without `--unsafe` (CLI) or the MCP
+`run_nyxscript` tool (which *never* enables `--unsafe` — an MCP call
+can't get arbitrary code execution or arbitrary-host network access
+through this path, by design). Don't reach for these unless the task
+genuinely needs them; prefer the built-ins and audited scan modules
+(`run dns`/`run tls`/`run http`/`network.discover`/`network.scan`)
+first — `socket.*` in particular is for when you need to speak a
+protocol none of those cover (a custom text protocol, a non-HTTP
+service), not a replacement for them.
 
-A script can also self-enable them with a bare `unsafe` statement
+```
+unsafe
+set h = socket.connect("example.com", 80, "tcp", 5.0)
+socket.send(h, "GET / HTTP/1.0\r\n\r\n")
+print socket.recv_text(h, 4096, 5.0)
+socket.close(h)
+```
+
+`socket.connect(host, port[, protocol][, timeout])` → handle (protocol
+`"tcp"`/`"udp"`), `socket.send(handle, data)` (string or list of byte
+values), `socket.recv(handle[, max_bytes][, timeout])` → list of byte
+values, `socket.recv_text(...)` → UTF-8 string, `socket.close(handle)`.
+Every blocking call has an explicit timeout; a one-shot run (`nyx
+script run`, the TUI's Run button) auto-closes connections a script
+left open.
+
+A script can also self-enable all three with a bare `unsafe` statement
 (typically the first line), instead of the caller passing `--unsafe`:
 
 ```
@@ -279,9 +306,11 @@ end
 print result
 ```
 
-`nyx script lint` surfaces this as a warning (doesn't block execution)
-so it stays visible. Still not reachable via the MCP `run_nyxscript`
-tool regardless of what the script itself contains.
+`nyx script lint` surfaces `unsafe` and every `socket.*` call as a
+warning (doesn't block execution) so they stay visible when reviewing
+a script someone else wrote. None of the three are reachable via the
+MCP `run_nyxscript` tool regardless of what the script itself
+contains.
 
 ```
 pip "requests"

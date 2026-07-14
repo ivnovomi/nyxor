@@ -65,6 +65,30 @@ pure/synchronous with no I/O, **except**:
 | `base64_decode` | `(s)` | Decodes base64 `s` back to a UTF-8 string (errors if the decoded bytes aren't valid UTF-8 — no bytes type to hold them otherwise) |
 | `random` | `()` | A random float in `[0.0, 1.0)` |
 
+### Byte-level helpers
+
+NyxScript has no bytes type — binary data crosses the `socket.*`
+boundary (below) as a UTF-8 string or a list of ints 0-255. These build
+and parse that; all pure, always available, no `--unsafe` needed.
+Integers pack/unpack in network byte order (big-endian).
+
+| Function | Signature | Description |
+|---|---|---|
+| `bytes_from_hex` | `(s)` | Hex string → list of byte values |
+| `bytes_to_hex` | `(list)` | List of byte values → hex string |
+| `bytes_from_string` | `(s)` | UTF-8 encodes `s` → list of byte values |
+| `bytes_to_string` | `(list)` | Decodes a list of byte values as UTF-8 |
+| `pack_uint16` | `(n)` | `n` as 2 big-endian bytes (a list) |
+| `pack_uint32` | `(n)` | `n` as 4 big-endian bytes (a list) |
+| `unpack_uint16` | `(list)` | 2 big-endian bytes → int |
+| `unpack_uint32` | `(list)` | 4 big-endian bytes → int |
+
+```
+print bytes_to_hex(bytes_from_string("AB"))  # 4142
+print pack_uint16(4660)                      # [18, 52]
+print unpack_uint16([18, 52])                # 4660
+```
+
 ### Higher-order functions
 
 These call a NyxScript function value per item, so they're handled
@@ -99,6 +123,33 @@ script works unmodified either way.
 | `ui.table` | `(headers, rows)` | prints a table, no return value |
 | `ui.banner` | `(text)` | prints a rule with a heading, no return value |
 | `ui.status` | `(message)` | prints a dim status line, no return value |
+
+### `socket.*` — raw TCP/UDP network access
+
+⚠️ **Requires `--unsafe`** (CLI/TUI flag, or a script-level `unsafe`
+statement — never reachable via `nyx mcp`). Unlike every other module
+in this reference, this reaches arbitrary hosts/ports outside NYXOR's
+audited scan modules — see
+[Security § `--unsafe` gating](Security#unsafe-gating) before reaching
+for it. Every blocking call has an explicit timeout; a script that
+forgets to `socket.close()` gets cleaned up automatically when a
+one-shot run (`nyx script run`, the TUI's Run button) ends.
+
+| Function | Signature | Description |
+|---|---|---|
+| `socket.connect` | `(host, port[, protocol][, timeout])` | Opens a `"tcp"` (default) or `"udp"` connection, returns a handle |
+| `socket.send` | `(handle, data)` | Sends a string (UTF-8 encoded) or a list of byte values |
+| `socket.recv` | `(handle[, max_bytes][, timeout])` | Reads available data as a list of byte values (default 4096 bytes, capped at 1 MiB) |
+| `socket.recv_text` | `(handle[, max_bytes][, timeout])` | Same, decoded as UTF-8 (errors on non-text data — use `socket.recv` + `bytes_to_hex` for binary protocols) |
+| `socket.close` | `(handle)` | Closes the connection |
+
+```
+unsafe
+set h = socket.connect("example.com", 80)
+socket.send(h, "GET / HTTP/1.0\r\n\r\n")
+print socket.recv_text(h, 4096, 5.0)
+socket.close(h)
+```
 
 ## The `⚠️ {{`/`}}` regex gotcha — and the fix
 
