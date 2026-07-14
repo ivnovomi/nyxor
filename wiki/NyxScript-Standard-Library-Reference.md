@@ -61,6 +61,9 @@ pure/synchronous with no I/O, **except**:
 | `regex_find` | `(text, pattern, default)` | First match, or `default` if none |
 | `regex_find_all` | `(text, pattern)` | Every match as a list (capture groups become nested lists, not tuples) |
 | `regex_replace` | `(text, pattern, replacement)` | Substitutes every match |
+| `base64_encode` | `(x)` | Base64-encodes `str(x)` |
+| `base64_decode` | `(s)` | Decodes base64 `s` back to a UTF-8 string (errors if the decoded bytes aren't valid UTF-8 — no bytes type to hold them otherwise) |
+| `random` | `()` | A random float in `[0.0, 1.0)` |
 
 ### Higher-order functions
 
@@ -256,6 +259,42 @@ Text-extraction helpers built on the `regex_*` builtins — see the
 | `extract_emails` | `(text)` | Every email-looking substring |
 | `extract_urls` | `(text)` | Every `http(s)://` URL substring, up to the next whitespace |
 | `matches_any` | `(text, patterns)` | True if any pattern in the list matches |
+
+### `lib/random.nyx`
+
+Built on the `random()` builtin.
+
+| Function | Params | Description |
+|---|---|---|
+| `random_int` | `(lo, hi)` | A random integer in `[lo, hi]`, inclusive both ends |
+| `choice` | `(items)` | A random element from a non-empty list |
+| `shuffle` | `(items)` | A new list in random order (Fisher-Yates) — does not mutate `items` |
+| `sample` | `(items, n)` | `n` random items without replacement |
+| `jitter` | `(base_seconds, spread)` | `base_seconds` ± up to `spread`, for randomized retry delays |
+
+### `lib/text.nyx`
+
+More string helpers on top of the builtins and `lib/strings.nyx`. No
+separate `repeat()` — the native `*` operator already repeats a string
+(`"x" * 3`).
+
+| Function | Params | Description |
+|---|---|---|
+| `capitalize` | `(s)` | Uppercases the first character, lowercases the rest |
+| `center` | `(s, width, ch)` | Centers `s` in a field of `width`, padded with `ch` |
+| `reverse` | `(s)` | `s` with characters in reverse order |
+| `contains_ignore_case` | `(text, needle)` | Case-insensitive substring test |
+| `count_occurrences` | `(text, needle)` | Non-overlapping occurrence count |
+| `is_blank` | `(s)` | True if `s` is empty or only whitespace |
+| `words` | `(s)` | Every whitespace-separated word in `s` |
+| `lines` | `(s)` | Splits `s` on `\n`, keeping empty lines |
+| `slugify` | `(s)` | Lowercases and collapses non-alphanumeric runs into a single hyphen |
+
+### `lib/table.nyx`
+
+| Function | Params | Description |
+|---|---|---|
+| `render` | `(headers, rows)` | An aligned, pipe-delimited plain-text table as a string — for `print`/`save`, distinct from the interactive `ui.table` (which needs a live terminal) |
 
 ### `lib/net.nyx`
 

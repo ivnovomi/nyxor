@@ -189,12 +189,15 @@ time.
 `abs`, `round`, `sorted`, `reversed`, `min`, `max`, `sum`, `type_of`,
 `keys`, `values`, `items`, `get`, `replace`, `starts_with`, `ends_with`,
 `find`, `zip`, `parse_json`, `to_json`, `now`, `to_iso8601`, `sha256`,
-`md5`. No `%` operator — use `mod(a, b)` from `lib/math.nyx` (see
-below). No `**` operator — see `lib/time.nyx`'s `backoff_delay` for
-exponentiation via repeated doubling. `parse_json` errors on `null` (no
-way to represent it — same reason `get()`'s default is mandatory).
-`range()`/`*` (sequence repetition) are capped at 1,000,000 resulting
-items.
+`md5`, `base64_encode`, `base64_decode`, `random`. No `%` operator —
+use `mod(a, b)` from `lib/math.nyx` (see below). No `**` operator —
+see `lib/time.nyx`'s `backoff_delay` for exponentiation via repeated
+doubling. `parse_json` errors on `null` (no way to represent it — same
+reason `get()`'s default is mandatory). `base64_decode` only succeeds
+on valid UTF-8 text (no bytes type to hold arbitrary binary otherwise).
+`random()` is `[0.0, 1.0)`, the other non-deterministic builtin besides
+`now()`. `range()`/`*` (sequence repetition) are capped at 1,000,000
+resulting items.
 
 **Regex builtins** — `regex_match(text, pattern)`,
 `regex_find(text, pattern, default)`, `regex_find_all(text, pattern)`,
@@ -231,7 +234,15 @@ strings for this reason.
 attaches to its result), `hash.nyx` (`short_hash`, `fingerprint`,
 `has_changed` — fingerprinting/dedup, not password hashing), `csv.nyx`
 (`parse_csv`, `to_csv` — quote-aware, no `--unsafe` needed), `regex.nyx`
-(`extract_ips`, `extract_emails`, `extract_urls`, `matches_any`).
+(`extract_ips`, `extract_emails`, `extract_urls`, `matches_any`),
+`random.nyx` (`random_int`, `choice`, `shuffle`, `sample`, `jitter` —
+`shuffle`/`sample` don't mutate their input), `text.nyx` (`capitalize`,
+`center`, `reverse`, `contains_ignore_case`, `count_occurrences`,
+`is_blank`, `words`, `lines`, `slugify` — the native `*` operator
+already repeats a string, so there's no separate `repeat()`),
+`table.nyx` (`render(headers, rows)` — an aligned plain-text table as a
+string, for `print`/`save`; distinct from the interactive `ui.table`,
+which needs a live terminal).
 Reach for these before reimplementing — e.g. don't hand-roll a dict merge
 when `dict.merge(a, b)` already exists, or a retry loop when
 `time.backoff_delay` already does exponential backoff.
