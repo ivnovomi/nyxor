@@ -75,10 +75,29 @@ print "Auditing {target}... ({len(target)} chars)"
 print "literal braces: {{not interpolated}}"
 ```
 
-**Gotcha**: this applies to *every* string literal, including regex
-patterns passed to `regex_match`/etc. — a quantifier like `{1,3}` needs
-doubled braces (`{{1,3}}`) or it gets silently mangled. See
-[NyxScript Standard Library Reference § the regex gotcha](NyxScript-Standard-Library-Reference#the-️-gotcha).
+**Gotcha**: this applies to *every* ordinary string literal, including
+regex patterns passed to `regex_match`/etc. — a quantifier like `{1,3}`
+needs doubled braces (`{{1,3}}`) or it gets silently mangled. Use a raw
+string instead (below) to sidestep this entirely.
+
+## Raw strings
+
+`r"..."` / `r'...'` — no `\`-escapes, no `{expr}` interpolation. Every
+character between the quotes is exactly what ends up in the value. This
+is the actual fix for the interpolation gotcha above, and for writing
+`\w`/`\d`/`\s`-style regex escapes without them colliding with
+NyxScript's own (much smaller) escape table:
+
+```
+print r"\w+ \d{2,4}"                            # \w+ \d{2,4}  (literally)
+print regex_match("hello 42", r"\w+ \d{2,4}")   # true — no doubled braces needed
+set path = r"C:\Users\test\file.txt"            # no backslash-escaping needed either
+```
+
+A raw string can still contain its own closing quote if it's preceded
+by a backslash (`r"a\"b"` → `a\"b`, backslash kept) — that's the only
+special case; everything else is completely literal, including
+backslashes that aren't followed by the closing quote.
 
 ## Dicts
 
@@ -291,6 +310,24 @@ script's variables; `pip` installs a package into the current
 environment. Both require `--unsafe` because they step outside
 NyxScript's safety model entirely — treat a script using them like any
 other executable. See [Security § --unsafe gating](Security#unsafe-gating).
+
+A script can also self-enable them with a bare `unsafe` statement
+(typically the first line), instead of the caller having to pass
+`--unsafe`:
+
+```
+unsafe
+python:
+    result = 6 * 7
+end
+print result
+```
+
+`nyx script lint` surfaces this as a warning (doesn't block execution)
+so it stays visible when reviewing a script someone else wrote. This
+statement is refused outright when run through `nyx mcp`'s
+`run_nyxscript` tool, regardless of what the script contains — see
+[Security § The `unsafe` statement vs. MCP](Security#the-unsafe-statement-vs-mcp).
 
 ## The linter
 

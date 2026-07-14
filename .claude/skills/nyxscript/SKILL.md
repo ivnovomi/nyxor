@@ -71,6 +71,12 @@ chainable: `result[0].findings[0].severity`.
 **String interpolation**: `{expr}` inside a string runs full NyxScript,
 not just a bare name; `{{`/`}}` are literal braces.
 
+**Raw strings**: `r"..."` / `r'...'` — no escapes, no `{expr}`
+interpolation, every character between the quotes is literal. Use these
+for regex patterns (`r"\d{2,4}"` instead of `"\\d{{2,4}}"`) and Windows
+paths (`r"C:\Users\x"`) — the one exception is a backslash right before
+the closing quote, which doesn't end the string but stays in the value.
+
 **Control flow**:
 
 ```
@@ -194,11 +200,12 @@ items.
 `regex_find(text, pattern, default)`, `regex_find_all(text, pattern)`,
 `regex_replace(text, pattern, replacement)`. Run in a sandboxed worker
 process with a 1-second timeout (catastrophic-backtracking patterns get
-killed, not left to hang). **Gotcha**: every string literal runs through
-`{expr}` interpolation, so a quantifier like `{1,3}` reads as an
-interpolation span and gets silently mangled — write `{{1,3}}` (doubled
-braces) in any pattern that needs one. `lib/regex.nyx` (below) already
-does this.
+killed, not left to hang). Write patterns as raw strings —
+`regex_match(text, r"\d{2,4}")` — so quantifiers like `{2,4}` and
+escapes like `\d`/`\w`/`\s` don't need any special handling; an ordinary
+`"..."` string would need `{{2,4}}` (doubled braces) instead, since it
+interpolates. `lib/regex.nyx` (below) writes all of its patterns as raw
+strings for this reason.
 
 **Standard library — `lib/`** (all written in NyxScript itself, `import
 "lib/NAME.nyx" as alias` same as any other library):

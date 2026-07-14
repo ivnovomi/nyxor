@@ -97,20 +97,30 @@ script works unmodified either way.
 | `ui.banner` | `(text)` | prints a rule with a heading, no return value |
 | `ui.status` | `(message)` | prints a dim status line, no return value |
 
-## The `⚠️ {{`/`}}` regex gotcha
+## The `⚠️ {{`/`}}` regex gotcha — and the fix
 
-Every NyxScript string literal runs through `{expr}` interpolation —
-including regex patterns. A quantifier like `{1,3}` or `{2,}` looks
-exactly like an interpolation span and gets silently evaluated/mangled
-unless you double the braces:
+Every *ordinary* NyxScript string literal runs through `{expr}`
+interpolation — including regex patterns. A quantifier like `{1,3}` or
+`{2,}` looks exactly like an interpolation span and gets silently
+evaluated/mangled unless you double the braces:
 
 ```
 print regex_match("aaa", "a{2,3}")     # WRONG — {2,3} gets interpolated away
-print regex_match("aaa", "a{{2,3}}")   # right — matches
+print regex_match("aaa", "a{{2,3}}")   # right, but ugly
 ```
 
-`lib/regex.nyx` (below) writes all of its own patterns this way for
-exactly this reason.
+**Better**: use a raw string (`r"..."`) — it never interpolates at all,
+so the pattern reads exactly like the regex it is, with no doubling and
+no fighting NyxScript's own escape table for `\w`/`\d`/`\s`:
+
+```
+print regex_match("aaa", r"a{2,3}")   # right, and reads normally
+```
+
+`lib/regex.nyx` (below) writes all of its patterns as raw strings for
+exactly this reason. See
+[NyxScript Language Guide § Raw strings](NyxScript-Language-Guide#raw-strings)
+for the full rules.
 
 ## `lib/` modules
 

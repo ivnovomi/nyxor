@@ -144,7 +144,33 @@ the script's variables; `pip` installs a package into the current
 environment. Both step outside NyxScript's "just makes requests to the
 targets you name" safety model entirely, so both require `--unsafe` —
 treat a script using them like you would any other executable you're
-choosing to run. Neither is reachable through `nyx mcp` at all.
+choosing to run.
+
+A script can also self-enable them with a bare `unsafe` statement
+instead of the caller passing `--unsafe` — see
+[NyxScript Language Guide § Escape hatches](NyxScript-Language-Guide#escape-hatches-python-and-pip).
+This deliberately inverts the earlier model, where `python:`/`pip` were
+opt-in only by whoever *runs* the script, never by the script itself —
+worth knowing before treating a shared `.nyx` file as inert just because
+you didn't pass `--unsafe` yourself.
+
+## The `unsafe` statement vs. MCP
+
+Adding the `unsafe` statement surfaced a real gap before it ever
+shipped: `nyx mcp`'s `run_nyxscript` tool hardcodes `unsafe=False`
+specifically so an MCP call can never reach `python:`/`pip` — but that
+flag is only a *starting* value on the interpreter, not a hard ceiling.
+A script submitted through that tool with a bare `unsafe` statement at
+the top would have self-escalated past `unsafe=False` anyway, defeating
+the one guarantee `run_nyxscript`'s own docstring makes.
+
+Fixed with a second, independent flag: `allow_unsafe_directive`
+(default `True`, so `nyx script run`/`nyx tui` are unaffected — that's
+the whole point of the feature). `run_nyxscript` sets it `False`, which
+makes the `unsafe` statement raise a script error instead of silently
+granting what the caller tried to withhold. `unsafe=False` alone was
+never enough to guarantee that; `allow_unsafe_directive=False` is what
+actually does.
 
 ## MCP is deliberately narrower than the CLI
 
