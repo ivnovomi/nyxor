@@ -69,6 +69,39 @@ async def test_crtsh_subdomains_returns_empty_set_on_bad_json(
     assert names == set()
 
 
+async def test_crtsh_subdomains_returns_empty_set_on_well_formed_but_unexpected_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # crt.sh (or a proxy in front of it) can return valid JSON that isn't a
+    # list of certificate entries, e.g. a rate-limit response like
+    # {"error": "..."} — this must not crash the whole recon run.
+    async def fake_get(self, url, params=None, **kwargs):  # noqa: ANN001
+        return httpx.Response(
+            200, json={"error": "rate limited"}, request=httpx.Request("GET", url)
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+
+    names = await crtsh_subdomains("example.com")
+
+    assert names == set()
+
+
+async def test_crtsh_subdomains_skips_non_dict_entries(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_get(self, url, params=None, **kwargs):  # noqa: ANN001
+        return httpx.Response(
+            200,
+            json=["not-a-dict", {"name_value": "api.example.com"}],
+            request=httpx.Request("GET", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
+
+    names = await crtsh_subdomains("example.com")
+
+    assert names == {"api.example.com"}
+
+
 async def test_run_recon_reports_an_error_when_nothing_is_found(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

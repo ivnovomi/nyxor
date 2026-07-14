@@ -67,7 +67,12 @@ from nyxor.core.scripting.ast_nodes import (
     WhileStmt,
     function_docstring,
 )
-from nyxor.core.scripting.builtins import BUILTIN_FUNCTIONS, HIGHER_ORDER_FUNCTIONS, format_value
+from nyxor.core.scripting.builtins import (
+    BUILTIN_FUNCTIONS,
+    HIGHER_ORDER_FUNCTIONS,
+    REGEX_BUILTIN_FUNCTIONS,
+    format_value,
+)
 from nyxor.core.scripting.errors import RuntimeScriptError, ScriptError
 from nyxor.core.scripting.parser import parse, parse_expression
 from nyxor.core.scripting.sockets import SOCKET_FUNCTIONS, ScriptSocket
@@ -409,7 +414,16 @@ class Interpreter:
         args = [await self.eval_expr(arg) for arg in call.args]
 
         if call.callee in HIGHER_ORDER_FUNCTIONS:
-            return await self._call_higher_order(call.callee, args, call.line)
+            try:
+                return await self._call_higher_order(call.callee, args, call.line)
+            except TypeError as exc:
+                # e.g. sort_by() with a key function whose results aren't
+                # mutually comparable (mixing str and int) — list.sort()
+                # raises a bare TypeError that must be wrapped the same way
+                # every other call path here wraps builtin/ui/socket errors,
+                # or it escapes as an "Unexpected error" instead of the
+                # clean, line-numbered message scripts expect.
+                raise RuntimeScriptError(str(exc), line=call.line) from exc
 
         if "." in call.callee:
             module_name, member = call.callee.split(".", 1)
@@ -443,8 +457,15 @@ class Interpreter:
             raise RuntimeScriptError(f"unknown function '{call.callee}'", line=call.line)
 
         if call.callee in BUILTIN_FUNCTIONS:
+            fn = BUILTIN_FUNCTIONS[call.callee]
             try:
-                return BUILTIN_FUNCTIONS[call.callee](args)
+                if call.callee in REGEX_BUILTIN_FUNCTIONS:
+                    # regex_* blocks on a pipe to the worker process for up
+                    # to the regex timeout (~1s worst case) — running it
+                    # synchronously here would freeze the whole event loop
+                    # (TUI redraws, MCP/API concurrency) for that long.
+                    return await asyncio.to_thread(fn, args)
+                return fn(args)
             except (TypeError, ValueError, IndexError, ZeroDivisionError) as exc:
                 raise RuntimeScriptError(str(exc), line=call.line) from exc
 
@@ -707,7 +728,20 @@ class Interpreter:
 
     async def _exec_import(self, path_expr: Expr, alias: str, line: int) -> None:
         path_str = _format_value(await self.eval_expr(path_expr))
-        path = (self.base_dir / path_str).resolve()
+        base = self.base_dir.resolve()
+        # Same containment check as `save ... as`: `Path.__truediv__` silently
+        # discards `base` for an absolute `path_str`, and ".." segments can
+        # walk out of it even when it isn't — without this, a script run
+        # without --unsafe could `import "../../../etc/passwd"`-style its way
+        # into reading (and, via print/save, exfiltrating) any file the
+        # process can access.
+        path = (base / path_str).resolve()
+        if not path.is_relative_to(base):
+            raise RuntimeScriptError(
+                f"'import {path_str!r}' would read a file outside the script's "
+                f"working directory ({base}) — not allowed.",
+                line=line,
+            )
 
         if not path.is_file():
             raise RuntimeScriptError(f"cannot import {path_str!r}: file not found", line=line)

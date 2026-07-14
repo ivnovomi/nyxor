@@ -156,7 +156,8 @@ def create_app(config: NyxorConfig | None = None) -> FastAPI:
 </body></html>"""
 
     @app.post("/oauth/device/approve")
-    async def oauth_device_approve(user_code: str) -> dict[str, str]:
+    async def oauth_device_approve(request: Request, user_code: str) -> dict[str, str]:
+        _require_loopback_caller(request)
         try:
             devices.approve(user_code)
         except OAuthError as exc:
@@ -175,6 +176,40 @@ def create_app(config: NyxorConfig | None = None) -> FastAPI:
         return {"access_token": token, "token_type": "bearer"}
 
     return app
+
+
+def _require_loopback_caller(request: Request) -> None:
+    """Device-flow approval has no separate operator credential to check —
+
+    unlike a real IdP (Google, GitHub), NYXOR has no account system, so
+    nothing distinguishes "the legitimate operator clicked approve" from
+    "any client that can reach this API called POST /oauth/device/approve".
+    Without this check, a script could call ``/oauth/device/code`` and then
+    immediately self-approve its own ``user_code``, minting itself a valid
+    bearer token for ``/inventory`` with zero human involvement whenever the
+    API is bound beyond loopback (``nyx serve --host 0.0.0.0``).
+
+    Restricting approval to callers on the same host as the server makes the
+    already-documented mitigation ("the CLI's default bind of 127.0.0.1")
+    an enforced boundary instead of an incidental one: an operator serving
+    on a non-loopback interface for scanning still keeps approval local
+    (e.g. via an SSH tunnel) rather than open to anyone who can reach the
+    API.
+    """
+    host = request.client.host if request.client else None
+    try:
+        ip = ipaddress.ip_address(host) if host else None
+    except ValueError:
+        ip = None
+    if ip is None or not ip.is_loopback:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "device-flow approval is only accepted from localhost — "
+                "if the API is served on a non-loopback interface, approve "
+                "over an SSH tunnel or from a shell on the same host"
+            ),
+        )
 
 
 def _require_bearer_token(devices: DeviceAuthStore, authorization: str | None) -> None:
@@ -210,6 +245,12 @@ def _reject_if_unsafe_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, host
         or ip.is_reserved
         or ip.is_multicast
         or ip.is_unspecified
+        # Belt-and-suspenders: catches ranges like the 100.64.0.0/10 CGNAT /
+        # Shared Address Space block, which Python's ipaddress module
+        # deliberately excludes from *both* is_private and is_global (it's
+        # neither), so it would otherwise sail past every check above while
+        # still routing to cloud-internal infrastructure (AWS ENIs, etc.).
+        or not ip.is_global
     )
     if unsafe:
         raise HTTPException(

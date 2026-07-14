@@ -81,3 +81,43 @@ async def test_running_a_scan_populates_results_and_inventory(
         scan_table = app.query_one("#scan-table", DataTable)
         assert scan_table.row_count == 1
         assert len(app.inventory.list()) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_finding_title_containing_brackets_does_not_crash_the_scan_tab(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    # A title like "Unexpected [/redirect] found" is real Rich markup
+    # syntax — unescaped, Text.from_markup either silently drops the
+    # bracketed text or raises rich.errors.MarkupError.
+    from nyxor.core.models import Finding, ModuleResult
+    from nyxor.plugins.inventory.store import InventoryStore
+
+    async def fake_lookup(domain: str, resolvers: list[str], timeout: float) -> ModuleResult:
+        result = ModuleResult(module="dns.lookup", target=domain)
+        result.findings.append(
+            Finding(title="TXT record(s)", description="unexpected [/redirect] value present")
+        )
+        return result
+
+    monkeypatch.setattr("nyxor.plugins.tui.app.dns_run_lookup", fake_lookup)
+
+    app = NyxorApp()
+    app.inventory = InventoryStore(path=tmp_path / "inventory.json")
+
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        from textual.widgets import Input, Select
+
+        await pilot.press("3")
+        await pilot.pause()
+        app.query_one("#module-select", Select).value = "dns.lookup"
+        app.query_one("#target-input", Input).value = "example.com"
+        await pilot.click("#run-scan")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        scan_table = app.query_one("#scan-table", DataTable)
+        assert scan_table.row_count == 1
+        status = app.query_one("#scan-status")
+        assert "Error" not in str(status.render())

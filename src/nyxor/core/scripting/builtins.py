@@ -875,3 +875,11 @@ BUILTIN_FUNCTIONS: dict[str, BuiltinFn] = {
     "regex_find_all": _regex_find_all,
     "regex_replace": _regex_replace,
 }
+
+# Builtins that block on IPC to the regex worker process (up to
+# _REGEX_TIMEOUT_SECONDS) — the interpreter runs these off the event loop
+# thread instead of calling them inline like every other (fast, CPU-only)
+# builtin.
+REGEX_BUILTIN_FUNCTIONS = frozenset(
+    {"regex_match", "regex_find", "regex_find_all", "regex_replace"}
+)

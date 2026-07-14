@@ -4,6 +4,17 @@ from nyxor.core.reporting.base import ReportWriter
 from nyxor.core.reporting.document import ReportDocument
 
 
+def _escape_table_cell(text: str) -> str:
+    """Neutralize characters that would split a Markdown table cell.
+
+    ``|`` opens a new column and a bare newline breaks the row entirely —
+    both can appear in target-controlled data (a finding title built from a
+    response header, a TXT record value, ...), not just in
+    ``finding.description``.
+    """
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
 class MarkdownReportWriter(ReportWriter):
     format_name = "markdown"
 
@@ -35,8 +46,9 @@ class MarkdownReportWriter(ReportWriter):
                 lines.append("| Severity | Title | Description |")
                 lines.append("|---|---|---|")
                 for finding in result.findings:
-                    desc = finding.description.replace("|", "\\|").replace("\n", " ")
-                    lines.append(f"| {finding.severity.value} | {finding.title} | {desc} |")
+                    title = _escape_table_cell(finding.title)
+                    desc = _escape_table_cell(finding.description)
+                    lines.append(f"| {finding.severity.value} | {title} | {desc} |")
                 lines.append("")
             else:
                 lines.append("_No findings._")

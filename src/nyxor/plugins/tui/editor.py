@@ -317,16 +317,38 @@ class NyxScriptEditor(TextArea):
         talk LSP. Resolved against the current working directory, matching
         how the interpreter itself resolves imports (never relative to the
         editor's own open file).
+
+        This runs on every keystroke (see ``completion_context``), so each
+        imported file's read + parse is cached by path and invalidated on
+        mtime change — otherwise typing anywhere in a script with imports
+        would re-read and re-parse every one of them per character typed.
         """
+        cache: dict[Path, tuple[float, list[str]]] | None = getattr(self, "_import_fn_cache", None)
+        if cache is None:
+            cache = {}
+            self._import_fn_cache = cache
+
         out: dict[str, list[str]] = {}
         for alias, path in scan_imports(self.text).items():
             target = resolve_import_path(Path.cwd(), path)
             if not target.is_file():
                 continue
+            try:
+                mtime = target.stat().st_mtime
+            except OSError:
+                continue
+
+            cached = cache.get(target)
+            if cached is not None and cached[0] == mtime:
+                out[alias] = cached[1]
+                continue
+
             lib_program = parse_best_effort(target.read_text(encoding="utf-8"))
             if lib_program is None:
                 continue
-            out[alias] = sorted(top_level_functions(lib_program))
+            functions = sorted(top_level_functions(lib_program))
+            cache[target] = (mtime, functions)
+            out[alias] = functions
         return out
 
     def completion_context(self) -> tuple[str, list[str]]:

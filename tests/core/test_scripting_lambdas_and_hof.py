@@ -4,6 +4,7 @@ import pytest
 
 from nyxor.core.config import load_config
 from nyxor.core.scripting import lint_source, run_script
+from nyxor.core.scripting.errors import RuntimeScriptError
 
 
 async def _run(source: str) -> list[str]:
@@ -54,6 +55,21 @@ print sort_by(words, lambda(w): len(w))
 """
     )
     assert lines == ["[fig, kiwi, banana]"]
+
+
+@pytest.mark.asyncio
+async def test_sort_by_with_mutually_incomparable_keys_raises_a_clean_script_error() -> None:
+    # A key function that returns mixed types (str and int) makes Python's
+    # list.sort() raise a bare TypeError — it must surface as a normal,
+    # line-numbered RuntimeScriptError like every other builtin misuse,
+    # not escape as an unhandled interpreter crash.
+    with pytest.raises(RuntimeScriptError):
+        await _run(
+            """
+set items = [3, "a", 1]
+print sort_by(items, lambda(x): x)
+"""
+        )
 
 
 @pytest.mark.asyncio

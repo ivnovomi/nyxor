@@ -15,12 +15,14 @@ single-operator instance.
 
 from __future__ import annotations
 
+import hmac
 import secrets
 import string
 import time
 from dataclasses import dataclass, field
 
 DEVICE_CODE_TTL_SECONDS = 600
+TOKEN_TTL_SECONDS = 30 * 24 * 3600  # bearer tokens are good for 30 days, then must be re-issued
 POLL_INTERVAL_SECONDS = 3
 _USER_CODE_ALPHABET = "".join(sorted(set(string.ascii_uppercase) - set("ILOU")))  # unambiguous
 
@@ -59,13 +61,22 @@ class DeviceAuthStore:
     def __init__(self) -> None:
         self._by_device_code: dict[str, DeviceAuth] = {}
         self._by_user_code: dict[str, str] = {}
-        self._valid_tokens: set[str] = set()
+        self._valid_tokens: dict[str, float] = {}  # token -> issued_at (monotonic)
 
     def _sweep_expired(self) -> None:
         expired = [dc for dc, auth in self._by_device_code.items() if auth.expired]
         for dc in expired:
             auth = self._by_device_code.pop(dc)
             self._by_user_code.pop(auth.user_code, None)
+
+        now = time.monotonic()
+        expired_tokens = [
+            token
+            for token, issued_at in self._valid_tokens.items()
+            if now - issued_at > TOKEN_TTL_SECONDS
+        ]
+        for token in expired_tokens:
+            del self._valid_tokens[token]
 
     def create(self) -> DeviceAuth:
         self._sweep_expired()
@@ -85,7 +96,7 @@ class DeviceAuthStore:
             raise OAuthError("expired_token", "this code has expired")
         auth.status = "approved"
         auth.access_token = secrets.token_urlsafe(32)
-        self._valid_tokens.add(auth.access_token)
+        self._valid_tokens[auth.access_token] = time.monotonic()
         return auth
 
     def poll(self, device_code: str) -> str:
@@ -108,7 +119,11 @@ class DeviceAuthStore:
         return auth.access_token
 
     def is_valid_token(self, token: str) -> bool:
-        return token in self._valid_tokens
+        self._sweep_expired()
+        # Constant-time membership check: a plain `in` on a dict/set short-circuits
+        # on the first differing byte of each candidate key's hash bucket, which is
+        # a (largely theoretical, but free to close) timing side channel.
+        return any(hmac.compare_digest(token, candidate) for candidate in self._valid_tokens)
 
 
 # One store per API process — created once in create_app() and closed over

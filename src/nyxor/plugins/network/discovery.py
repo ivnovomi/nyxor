@@ -12,6 +12,17 @@ import platform
 import shutil
 
 
+def ping_binary_available() -> bool:
+    """Whether a ``ping`` executable exists on PATH.
+
+    Minimal container images often ship without ``iputils``/``ping`` — when
+    that's the case, every host silently "fails" its ping, which is
+    indistinguishable from "every host is actually down" unless a caller
+    checks this first and surfaces it as an error instead.
+    """
+    return shutil.which("ping") is not None
+
+
 def _ping_args(host: str, timeout: float) -> list[str] | None:
     ping_path = shutil.which("ping")
     if ping_path is None:

@@ -55,6 +55,29 @@ def test_markdown_writer_includes_findings() -> None:
     assert "A record(s)" in rendered
 
 
+def test_markdown_writer_escapes_pipes_and_newlines_in_the_title() -> None:
+    # finding.title can come from target-controlled data (a response header,
+    # a TXT record, ...) just as much as description — unescaped, a "|" adds
+    # a bogus extra column and a "\n" breaks the table row across lines.
+    result = ModuleResult(
+        module="http.inspect",
+        target="example.com",
+        findings=[
+            Finding(
+                title="Weird | Header\nWith a newline",
+                severity=Severity.LOW,
+                description="fine",
+            )
+        ],
+    )
+    document = ReportDocument(title="Test Report", results=[result])
+
+    rendered = get_writer("markdown").render(document)
+
+    table_line = next(line for line in rendered.splitlines() if line.startswith("| low"))
+    assert "Weird \\| Header With a newline" in table_line
+
+
 def test_html_writer_escapes_and_includes_findings() -> None:
     writer = get_writer("html")
     rendered = writer.render(_sample_document())
