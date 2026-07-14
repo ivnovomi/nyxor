@@ -135,9 +135,7 @@ async def test_run_script_closes_sockets_left_open_by_the_script(echo_server: in
 async def test_socket_functions_are_lint_warnings_not_errors() -> None:
     from nyxor.core.scripting import lint_source
 
-    issues = lint_source(
-        'unsafe\nset h = socket.connect("127.0.0.1", 80)\nsocket.close(h)\n'
-    )
+    issues = lint_source('unsafe\nset h = socket.connect("127.0.0.1", 80)\nsocket.close(h)\n')
     assert all(issue.severity == "warning" for issue in issues)
     assert any("socket.connect" in issue.message for issue in issues)
 

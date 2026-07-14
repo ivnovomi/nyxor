@@ -58,7 +58,7 @@ async def test_humanize_delegates_to_format_human_duration() -> None:
 
 
 async def test_now_iso_returns_an_iso8601_string() -> None:
-    lines = await _run("print starts_with(time.now_iso(), \"20\")\n")
+    lines = await _run('print starts_with(time.now_iso(), "20")\n')
     assert lines == ["true"]
 
 

@@ -30,9 +30,7 @@ async def _fake_discover(target: str, config: object) -> list[ModuleResult]:
                     source_module="network.discover",
                 ),
                 Asset(kind="host", identifier="192.168.1.2", attributes={}),
-                Asset(
-                    kind="service", identifier="192.168.1.1:22", attributes={"proto": "ssh"}
-                ),
+                Asset(kind="service", identifier="192.168.1.1:22", attributes={"proto": "ssh"}),
             ],
         )
     ]
@@ -57,7 +55,7 @@ async def _run(body: str) -> list[str]:
 
 
 async def test_by_kind_filters_to_the_matching_kind() -> None:
-    lines = await _run("print asset.identifiers(asset.by_kind(assets, \"host\"))\n")
+    lines = await _run('print asset.identifiers(asset.by_kind(assets, "host"))\n')
     assert lines == ["[192.168.1.1, 192.168.1.2]"]
 
 

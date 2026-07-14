@@ -63,9 +63,7 @@ def test_build_ip_header_rejects_an_invalid_ip() -> None:
 
 async def test_build_ip_header_from_nyxscript() -> None:
     lines = await _run(
-        'set h = build_ip_header("10.0.0.1", "10.0.0.2", 6, [])\n'
-        "print len(h)\n"
-        "print checksum(h)\n"
+        'set h = build_ip_header("10.0.0.1", "10.0.0.2", 6, [])\nprint len(h)\nprint checksum(h)\n'
     )
     assert lines[0] == "20"
     assert lines[1] == "0"
@@ -79,10 +77,7 @@ def test_build_tcp_header_self_checksums_to_zero_with_pseudo_header() -> None:
     payload = [9, 9]
     header = _build_tcp_header([src, dst, 12345, 80, 1000, 0, "SYN", payload])
     assert len(header) == 20
-    pseudo = (
-        bytes([10, 0, 0, 1, 10, 0, 0, 2, 0, 6])
-        + (20 + len(payload)).to_bytes(2, "big")
-    )
+    pseudo = bytes([10, 0, 0, 1, 10, 0, 0, 2, 0, 6]) + (20 + len(payload)).to_bytes(2, "big")
     assert _internet_checksum(pseudo + bytes(header) + bytes(payload)) == 0
 
 
@@ -109,10 +104,7 @@ def test_build_udp_header_self_checksums_to_zero_with_pseudo_header() -> None:
     payload = [1, 2, 3]
     header = _build_udp_header([src, dst, 12345, 53, payload])
     assert len(header) == 8
-    pseudo = (
-        bytes([10, 0, 0, 1, 10, 0, 0, 2, 0, 17])
-        + (8 + len(payload)).to_bytes(2, "big")
-    )
+    pseudo = bytes([10, 0, 0, 1, 10, 0, 0, 2, 0, 17]) + (8 + len(payload)).to_bytes(2, "big")
     assert _internet_checksum(pseudo + bytes(header) + bytes(payload)) == 0
 
 

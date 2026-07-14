@@ -21,23 +21,17 @@ async def _run(body: str) -> list[str]:
 
 
 async def test_extract_ips_finds_dotted_quads() -> None:
-    lines = await _run(
-        'print re.extract_ips("server at 10.0.0.5 and 192.168.1.1 responded")\n'
-    )
+    lines = await _run('print re.extract_ips("server at 10.0.0.5 and 192.168.1.1 responded")\n')
     assert lines == ["[10.0.0.5, 192.168.1.1]"]
 
 
 async def test_extract_emails_finds_addresses() -> None:
-    lines = await _run(
-        'print re.extract_emails("contact admin@example.com or ops@corp.io")\n'
-    )
+    lines = await _run('print re.extract_emails("contact admin@example.com or ops@corp.io")\n')
     assert lines == ["[admin@example.com, ops@corp.io]"]
 
 
 async def test_extract_urls_stops_at_whitespace() -> None:
-    lines = await _run(
-        'print re.extract_urls("see https://example.com/report and stop here")\n'
-    )
+    lines = await _run('print re.extract_urls("see https://example.com/report and stop here")\n')
     assert lines == ["[https://example.com/report]"]
 
 

@@ -24,9 +24,7 @@ def _make_self_signed_cert() -> tuple[bytes, bytes]:
     verify=true/false behavior without touching the real network.
     """
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    subject = issuer = x509.Name(
-        [x509.NameAttribute(NameOID.COMMON_NAME, "localhost")]
-    )
+    subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "localhost")])
     now = datetime.datetime.now(datetime.UTC)
     cert = (
         x509.CertificateBuilder()

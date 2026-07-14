@@ -172,9 +172,7 @@ def test_normal_completion_is_unaffected_outside_an_import_statement(
     assert "print" in labels
 
 
-def test_completion_after_an_imported_alias_dot_lists_its_functions(
-    server, tmp_path: Path
-) -> None:
+def test_completion_after_an_imported_alias_dot_lists_its_functions(server, tmp_path: Path) -> None:
     main_source = 'import "lib/mathlib.nyx" as math\n\nmath.'
     lib_source = (
         'func square(x):\n    "Returns x squared."\n    return x * x\nend\n\n'

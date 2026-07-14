@@ -127,15 +127,8 @@ async def test_slugify() -> None:
 
 
 async def test_table_render_aligns_columns() -> None:
-    lines = await _run(
-        'print table.render(["name", "grade"], [["a", "A"], ["bb", "B+"]])\n'
-    )
-    assert lines == [
-        "| name | grade |\n"
-        "+------+-------+\n"
-        "| a    | A     |\n"
-        "| bb   | B+    |"
-    ]
+    lines = await _run('print table.render(["name", "grade"], [["a", "A"], ["bb", "B+"]])\n')
+    assert lines == ["| name | grade |\n+------+-------+\n| a    | A     |\n| bb   | B+    |"]
 
 
 async def test_table_render_with_no_rows() -> None:

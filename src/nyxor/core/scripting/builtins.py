@@ -377,9 +377,7 @@ def _regex_worker_loop(conn: Any) -> None:
             elif op == "find_all":
                 # findall() returns tuples for patterns with capture groups
                 # — NyxScript has no tuple type, only list, so normalize.
-                value = [
-                    list(r) if isinstance(r, tuple) else r for r in compiled.findall(text)
-                ]
+                value = [list(r) if isinstance(r, tuple) else r for r in compiled.findall(text)]
             else:
                 value = compiled.sub(replacement, text)
             conn.send(("ok", value))
