@@ -9,8 +9,9 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class Literal:
-    value: object  # str (raw, interpolated at eval time), int, float, or bool
+    value: object  # str (interpolated at eval time unless is_raw), int, float, or bool
     line: int
+    is_raw: bool = False  # from r"..."/r'...' — no {expr} interpolation, no escapes
 
 
 @dataclass(frozen=True)

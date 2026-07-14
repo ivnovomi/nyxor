@@ -265,6 +265,8 @@ class Interpreter:
 
     async def eval_expr(self, expr: Expr) -> Any:
         match expr:
+            case Literal(value=str() as raw, is_raw=True):
+                return raw
             case Literal(value=str() as raw, line=line):
                 return await self._interpolate(raw, line)
             case Literal(value=value):

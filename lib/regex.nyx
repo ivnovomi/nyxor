@@ -3,26 +3,24 @@
 # catastrophic-backtracking risk of their own), though the underlying
 # regex_* builtins have their own timeout guard regardless.
 #
-# Gotcha for anyone writing their *own* patterns: every NyxScript string
-# literal runs through {expr} interpolation, including regex patterns — a
-# quantifier like {1,3} or {2,} looks exactly like an interpolation span
-# and gets silently evaluated/mangled unless the braces are doubled
-# ({{1,3}}, {{2,}}), same as escaping a literal brace in a format string.
-# The patterns below are written that way for exactly this reason.
+# Written as r"..." raw strings on purpose: a normal NyxScript string
+# interpolates {expr}, so a quantifier like {1,3} would need doubling
+# ({{1,3}}) to survive — r"..." never interpolates at all, so the pattern
+# reads exactly like the regex it is.
 
 func extract_ips(text):
     "Every dotted-quad IPv4-looking substring in text (doesn't validate octet ranges — see lib/net.nyx's is_private_ipv4 for that)."
-    return regex_find_all(text, "\\b(?:[0-9]{{1,3}}\\.){{3}}[0-9]{{1,3}}\\b")
+    return regex_find_all(text, r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b")
 end
 
 func extract_emails(text):
     "Every email-looking substring in text."
-    return regex_find_all(text, "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{{2,}}")
+    return regex_find_all(text, r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 end
 
 func extract_urls(text):
     "Every http(s):// URL substring in text, up to the next whitespace."
-    return regex_find_all(text, "https?://[^\\s]+")
+    return regex_find_all(text, r"https?://[^\s]+")
 end
 
 func matches_any(text, patterns):

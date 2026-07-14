@@ -120,6 +120,19 @@ def _highlight_line(text: str) -> list[tuple[int, int | None, str]]:
                 end += 2 if text[end] == "\\" else 1
             end = min(end + 1, len(text))
             spans.append((start, end, "docstring" if is_docstring_line else "string"))
+        elif token.type == "RAWSTRING":
+            # Same idea, but the quote sits one character later (after the
+            # leading `r`), and only a backslash right before the closing
+            # quote is special — everything else in a raw string is literal.
+            quote = text[start + 1] if start + 1 < len(text) else '"'
+            end = start + 2
+            while end < len(text) and text[end] != quote:
+                if text[end] == "\\" and end + 1 < len(text) and text[end + 1] == quote:
+                    end += 2
+                else:
+                    end += 1
+            end = min(end + 1, len(text))
+            spans.append((start, end, "string"))
         elif token.type == "NUMBER":
             spans.append((start, start + len(token.value), "number"))
         elif token.type == "IDENT":

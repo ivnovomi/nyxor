@@ -211,6 +211,8 @@ def _check_expr(
             _check_expr(target, defined, functions, issues)
         case Call() as call:
             _check_call(call, defined, functions, issues)
+        case Literal(value=str(), is_raw=True):
+            pass  # r"..." never interpolates — nothing inside it to check
         case Literal(value=str() as raw, line=line):
             for inner in _interpolated_exprs(raw, line):
                 _check_expr(inner, defined, functions, issues)

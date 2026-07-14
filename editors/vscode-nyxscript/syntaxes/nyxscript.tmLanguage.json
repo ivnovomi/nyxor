@@ -51,6 +51,23 @@
     "strings": {
       "patterns": [
         {
+          "name": "string.quoted.double.raw.nyxscript",
+          "comment": "r\"...\" — no escapes recognized, no {expr} interpolation.",
+          "begin": "r\"",
+          "end": "\"",
+          "patterns": [
+            { "match": "\\\\\"", "name": "constant.character.escape.nyxscript" }
+          ]
+        },
+        {
+          "name": "string.quoted.single.raw.nyxscript",
+          "begin": "r'",
+          "end": "'",
+          "patterns": [
+            { "match": "\\\\'", "name": "constant.character.escape.nyxscript" }
+          ]
+        },
+        {
           "name": "string.quoted.double.nyxscript",
           "begin": "\"",
           "end": "\"",

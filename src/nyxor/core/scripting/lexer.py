@@ -55,7 +55,7 @@ _ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'"}
 
 @dataclass(frozen=True)
 class Token:
-    type: str  # "IDENT" | "NUMBER" | "STRING" | "NEWLINE" | "EOF" | an operator symbol
+    type: str  # "IDENT" | "NUMBER" | "STRING" | "RAWSTRING" | "NEWLINE" | "EOF" | an operator
     value: str
     line: int
     col: int
@@ -100,6 +100,43 @@ def tokenize(source: str, start_line: int = 1) -> list[Token]:
             continue
 
         col = i
+
+        if ch == "r" and i + 1 < n and source[i + 1] in "'\"":
+            # r"..."/r'...' — a raw string: no \-escapes, no {expr}
+            # interpolation, every character between the quotes is exactly
+            # what ends up in the value. The only special case is a
+            # backslash immediately before the *closing* quote character,
+            # which doesn't end the string (so r"C:\" is still open) — but
+            # unlike a normal string, that backslash stays in the value
+            # too, nothing is consumed silently. This exists because every
+            # normal NyxScript string interpolates {expr} — which makes a
+            # regex quantifier like {1,3} unwritable without doubling the
+            # braces — and because \w/\d-style regex escapes read oddly
+            # next to NyxScript's own (different) escape table.
+            quote = source[i + 1]
+            i += 2
+            raw_chars: list[str] = []
+            closed = False
+            while i < n:
+                c = source[i]
+                if c == "\n":
+                    break
+                if c == "\\" and i + 1 < n and source[i + 1] == quote:
+                    raw_chars.append(c)
+                    raw_chars.append(source[i + 1])
+                    i += 2
+                    continue
+                if c == quote:
+                    closed = True
+                    i += 1
+                    break
+                raw_chars.append(c)
+                i += 1
+            if not closed:
+                raise LexError(f"unterminated raw string starting at column {col + 1}", line=line)
+            tokens.append(Token("RAWSTRING", "".join(raw_chars), line, col))
+            line_has_token = True
+            continue
 
         if ch in "'\"":
             quote = ch

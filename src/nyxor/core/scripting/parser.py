@@ -492,6 +492,10 @@ class Parser:
             self._advance()
             return Literal(token.value, token.line)
 
+        if token.type == "RAWSTRING":
+            self._advance()
+            return Literal(token.value, token.line, is_raw=True)
+
         if token.type == "IDENT" and token.value == "true":
             self._advance()
             return Literal(True, token.line)
