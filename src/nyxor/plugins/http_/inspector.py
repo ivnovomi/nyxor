@@ -56,6 +56,8 @@ async def _read_capped_body(response: httpx.Response) -> bytes:
             break
         chunks.append(chunk)
         total += len(chunk)
+        if total >= MAX_BODY_BYTES:
+            break
     return b"".join(chunks)
 
 
