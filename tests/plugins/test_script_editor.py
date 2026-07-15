@@ -25,10 +25,13 @@ async def test_line_numbers_are_shown() -> None:
 @pytest.mark.asyncio
 async def test_short_prefixes_suggest_nothing() -> None:
     app = NyxorApp()
-    async with app.run_test():
+    async with app.run_test() as pilot:
         editor = app.query_one("#script-editor", NyxScriptEditor)
         editor.text = "pr"
         editor.move_cursor((0, 2))
+        # Drain the TextArea.Changed message this queued — otherwise it's
+        # left pending until app teardown, racing the app's own shutdown.
+        await pilot.pause()
         _prefix, matches = editor.completion_context()
         assert matches == []
 
@@ -36,11 +39,12 @@ async def test_short_prefixes_suggest_nothing() -> None:
 @pytest.mark.asyncio
 async def test_prefix_at_the_minimum_length_suggests() -> None:
     app = NyxorApp()
-    async with app.run_test():
+    async with app.run_test() as pilot:
         editor = app.query_one("#script-editor", NyxScriptEditor)
         assert MIN_COMPLETION_PREFIX == 3, "test below assumes a 3-char minimum"
         editor.text = "pri"
         editor.move_cursor((0, 3))
+        await pilot.pause()
         _prefix, matches = editor.completion_context()
         assert "print" in matches
 
@@ -54,7 +58,7 @@ async def test_completion_follows_an_imported_library_alias() -> None:
     # which Textual's test harness isolates to a per-test tmp dir — so the
     # library lives there rather than depending on this repo's real lib/.
     app = NyxorApp()
-    async with app.run_test():
+    async with app.run_test() as pilot:
         lib_dir = Path.cwd() / "lib"
         lib_dir.mkdir(exist_ok=True)
         (lib_dir / "demo.nyx").write_text(
@@ -66,6 +70,7 @@ async def test_completion_follows_an_imported_library_alias() -> None:
         editor = app.query_one("#script-editor", NyxScriptEditor)
         editor.text = 'import "lib/demo.nyx" as demo\n\ndemo.'
         editor.move_cursor((2, len("demo.")))
+        await pilot.pause()
         prefix, matches = editor.completion_context()
         assert prefix == "demo."
         assert "demo.square" in matches
@@ -83,7 +88,7 @@ async def test_imported_functions_are_cached_and_reloaded_on_change() -> None:
     import os
 
     app = NyxorApp()
-    async with app.run_test():
+    async with app.run_test() as pilot:
         lib_dir = Path.cwd() / "lib"
         lib_dir.mkdir(exist_ok=True)
         demo = lib_dir / "demo.nyx"
@@ -92,6 +97,7 @@ async def test_imported_functions_are_cached_and_reloaded_on_change() -> None:
         editor = app.query_one("#script-editor", NyxScriptEditor)
         editor.text = 'import "lib/demo.nyx" as demo\n\ndemo.'
         editor.move_cursor((2, len("demo.")))
+        await pilot.pause()
 
         _prefix, matches = editor.completion_context()
         assert "demo.square" in matches
@@ -124,10 +130,11 @@ async def test_imported_functions_are_cached_and_reloaded_on_change() -> None:
 @pytest.mark.asyncio
 async def test_completion_after_ui_dot_lists_ui_functions() -> None:
     app = NyxorApp()
-    async with app.run_test():
+    async with app.run_test() as pilot:
         editor = app.query_one("#script-editor", NyxScriptEditor)
         editor.text = "ui."
         editor.move_cursor((0, 3))
+        await pilot.pause()
         prefix, matches = editor.completion_context()
         assert prefix == "ui."
         assert "ui.confirm" in matches
