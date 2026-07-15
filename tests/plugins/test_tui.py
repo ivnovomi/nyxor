@@ -121,3 +121,27 @@ async def test_a_finding_title_containing_brackets_does_not_crash_the_scan_tab(
         assert scan_table.row_count == 1
         status = app.query_one("#scan-status")
         assert "Error" not in str(status.render())
+
+
+@pytest.mark.asyncio
+async def test_an_asset_identifier_containing_brackets_does_not_crash_the_inventory_tab(
+    tmp_path,
+) -> None:
+    # asset.identifier can hold target-controlled data (e.g. a raw DNS TXT
+    # record) that may contain square brackets — same DataTable markup-
+    # parsing hazard as finding.title/description on the Scan tab.
+    from nyxor.core.models import Asset
+    from nyxor.plugins.inventory.store import InventoryStore
+
+    app = NyxorApp()
+    app.inventory = InventoryStore(path=tmp_path / "inventory.json")
+    app.inventory.add(
+        [Asset(kind="dns:txt", identifier="weird [id] value", source_module="dns.lookup")]
+    )
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.refresh_inventory()
+
+        inventory_table = app.query_one("#inventory-table", DataTable)
+        assert inventory_table.row_count == 1

@@ -80,7 +80,7 @@ async def test_imported_functions_are_cached_and_reloaded_on_change() -> None:
     # not be re-read and re-parsed from disk every time unless they actually
     # changed on disk (mtime), or an editor with imports would do disk I/O
     # per character typed.
-    import time
+    import os
 
     app = NyxorApp()
     async with app.run_test():
@@ -106,14 +106,16 @@ async def test_imported_functions_are_cached_and_reloaded_on_change() -> None:
         editor.completion_context()
         assert next(iter(cache.values()))[0] == cached_mtime
 
-        # Ensure the mtime actually advances on this filesystem, then modify
-        # the file — the new function must show up, proving the cache
-        # invalidates rather than sticking forever.
-        time.sleep(0.01)
+        # Modify the file, then explicitly force its mtime forward — some
+        # filesystems only have 1s mtime resolution, so a real-time sleep
+        # (blocking or not) isn't a reliable way to make the timestamp
+        # advance deterministically in a test.
         demo.write_text(
             "func square(x):\n    return x * x\nend\nfunc cube(x):\n    return x * x * x\nend\n",
             encoding="utf-8",
         )
+        new_mtime = cached_mtime + 2
+        os.utime(demo, (new_mtime, new_mtime))
 
         _prefix, matches = editor.completion_context()
         assert "demo.cube" in matches

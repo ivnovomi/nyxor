@@ -624,11 +624,11 @@ class NyxorApp(App[None]):
             status.update("[bold #ff4d6d]Script failed.[/]")
             return
         except NyxorError as exc:
-            log.write(f"[bold #ff4d6d]Error:[/] {exc.message}")
+            log.write(f"[bold #ff4d6d]Error:[/] {escape_markup(exc.message)}")
             status.update("[bold #ff4d6d]Script failed.[/]")
             return
         except Exception as exc:  # keep the TUI alive no matter what a script does
-            log.write(f"[bold #ff4d6d]Unexpected error:[/] {exc}")
+            log.write(f"[bold #ff4d6d]Unexpected error:[/] {escape_markup(str(exc))}")
             status.update("[bold #ff4d6d]Script failed.[/]")
             return
 
@@ -768,14 +768,14 @@ class NyxorApp(App[None]):
             status.update("[bold #ff4d6d]Enter a target first.[/]")
             return
 
-        status.update(f"[#7ee7e1]Running {module} against {target}…[/]")
+        status.update(f"[#7ee7e1]Running {module} against {escape_markup(target)}…[/]")
         run_button.disabled = True
         table.clear()
 
         try:
             results = await self._dispatch(str(module), target, ports)
         except Exception as exc:  # keep the TUI alive no matter what a module raises
-            status.update(f"[bold #ff4d6d]Error:[/] {exc}")
+            status.update(f"[bold #ff4d6d]Error:[/] {escape_markup(str(exc))}")
             run_button.disabled = False
             return
 
@@ -810,7 +810,7 @@ class NyxorApp(App[None]):
             self.refresh_inventory()
 
         if all_errors:
-            status.update(f"[bold #ff4d6d]{'; '.join(all_errors)}[/]")
+            status.update(f"[bold #ff4d6d]{escape_markup('; '.join(all_errors))}[/]")
         else:
             status.update(
                 f"[#2ecc71]Done.[/] {total_findings} finding(s), "
