@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import typer
@@ -12,12 +11,8 @@ from nyxor.core.context import NyxorContext
 from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import Asset, Finding, ModuleResult, Severity
 from nyxor.core.output import emit_results
+from nyxor.plugins.http_.inspector import ValidateUrl
 from nyxor.plugins.tls_.inspector import WEAK_PROTOCOLS, inspect
-
-# See nyxor.plugins.http_.inspector.ValidateUrl for the same contract:
-# validate (and, for the REST API's SSRF guard, resolve/pin) a target
-# before it's actually connected to.
-ValidateHost = Callable[[str], Awaitable[str | None]]
 
 tls_app = typer.Typer(
     name="tls",
@@ -60,7 +55,7 @@ def _parse_target(target: str) -> tuple[str, int]:
 
 
 async def run_inspect(
-    target: str, timeout: float, *, validate_url: ValidateHost | None = None
+    target: str, timeout: float, *, validate_url: ValidateUrl | None = None
 ) -> ModuleResult:
     """Inspect the TLS certificate and negotiated connection for HOST[:PORT].
 

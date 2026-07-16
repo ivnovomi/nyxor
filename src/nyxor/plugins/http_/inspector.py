@@ -75,7 +75,14 @@ def _pin_url_to_ip(url: str, ip: str) -> tuple[str, str]:
     hosting) and/or the certificate won't validate against a bare IP.
     """
     parsed = urlsplit(url)
-    host = parsed.hostname or ""
+    host = parsed.hostname
+    if not host:
+        # A caller only reaches here with a pinned IP already in hand, which
+        # itself only happens after validate_url successfully resolved a
+        # hostname out of this same URL — an empty host at this point means
+        # that invariant broke, and sending a request with a blank Host
+        # header would be a confusing way to find out.
+        raise ValueError(f"cannot pin {url!r}: no hostname to preserve as Host/SNI")
     host_header = host if parsed.port is None else f"{host}:{parsed.port}"
     ip_literal = f"[{ip}]" if ":" in ip else ip
     netloc = ip_literal if parsed.port is None else f"{ip_literal}:{parsed.port}"
