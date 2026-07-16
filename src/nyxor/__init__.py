@@ -1,3 +1,3 @@
 """NYXOR — a modular, cross-platform security assessment and infrastructure auditing toolkit."""
 
-__version__ = "0.6.5"
+__version__ = "0.6.6"
