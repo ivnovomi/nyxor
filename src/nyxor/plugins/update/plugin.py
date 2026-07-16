@@ -16,9 +16,7 @@ from nyxor.core.interfaces import PluginMetadata
 PYPI_URL = "https://pypi.org/pypi/nyxor/json"
 
 
-def _update(
-    ctx: typer.Context, check_only: bool = typer.Option(True, "--check-only/--no-check-only")
-) -> None:
+def _update(ctx: typer.Context) -> None:
     """Check whether a newer version of NYXOR is available."""
     context: NyxorContext = ctx.obj
     logger = context.get_logger(__name__)

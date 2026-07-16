@@ -294,7 +294,7 @@ not hidden. Architecture, scope, and verification decisions are the
 maintainer's; judge the project by its tests and whether it actually
 works, the same standard you'd apply to any other codebase regardless
 of how it was written. See
-[`docs/contributing.md`](https://github.com/ivnovomi/nyxor/blob/main/docs/contributing.md#how-this-project-is-built)
+[Contributing § How this project is built](Contributing#how-this-project-is-built)
 for the fuller statement.
 
 ## Reporting a vulnerability

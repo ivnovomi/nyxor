@@ -2,7 +2,7 @@
 
 Pipeline: :mod:`lexer` → :mod:`parser` (produces the :mod:`ast_nodes` tree)
 → either :mod:`linter` (static analysis, no execution) or
-:mod:`interpreter` (runs it for real). See docs/architecture.md for the
+:mod:`interpreter` (runs it for real). See docs/nyxscript.md for the
 language reference and grammar.
 """
 

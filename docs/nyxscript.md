@@ -5,16 +5,17 @@ own lexer, recursive-descent parser, AST, tree-walking interpreter, and a
 standalone static linter — not a config format, not a YAML dialect, an
 actual small language. This document is the full reference: every
 statement, every expression form, functions, imports/libraries, the
-interactive `ui.*` module, and the two escape hatches.
+interactive `ui.*` module, and the `--unsafe` escape hatches
+(`python:`, `pip`, `unsafe`, `socket.*`).
 
 Run `nyx script new myfile.nyx` to get a starter file, `nyx script lint
 myfile.nyx` to check one without running it, `nyx script run myfile.nyx`
 to execute it, and `nyx script repl` for an interactive prompt where
 variables and functions persist between lines. Every editor with an LSP
 client (VS Code, Neovim, Helix, ...) gets diagnostics/completion/hover for
-free from `nyx script lsp` — see
-[plugin-development.md](plugin-development.md) if you're embedding
-NyxScript somewhere new.
+free from `nyx script lsp` — see the
+["Plugin Development" wiki page](https://github.com/ivnovomi/nyxor/wiki/Plugin-Development)
+if you're embedding NyxScript somewhere new.
 
 ## Contents
 
@@ -37,7 +38,8 @@ NyxScript somewhere new.
 - [Interactive UI — `ui.*`](#interactive-ui--ui)
 - [Diagnostics — `print` / `assert` / `fail` / `sleep`](#diagnostics)
 - [The REPL](#the-repl)
-- [Escape hatches: `python:` and `pip`](#escape-hatches-python-and-pip)
+- [Escape hatches: `unsafe`, `python:`, and `pip`](#escape-hatches-unsafe-python-and-pip)
+- [Raw sockets and packets — `socket.*`](#raw-sockets-and-packets--socket)
 - [The linter](#the-linter)
 - [Errors](#errors)
 - [Full grammar](#full-grammar)
@@ -62,6 +64,7 @@ end
 | Type | Literal syntax | Notes |
 |---|---|---|
 | string | `"double"` or `'single'` quotes | supports `\n \t \\ \" \'` escapes and `{expr}` interpolation |
+| raw string | `r"double"` or `r'single'` | no escapes, no `{expr}` interpolation — only `\"`/`\'` is special, so the string can still end; useful for regex patterns and Windows paths |
 | number | `42`, `3.14` | `int` if no `.`, otherwise `float` |
 | boolean | `true`, `false` | |
 | list | `[1, 2, 3]`, `["a", "b"]` | heterogeneous, indexable |
@@ -249,9 +252,10 @@ run MODULE TARGET [as VAR]
 ```
 
 `MODULE` is one of `audit`, `dns`, `tls`, `http`, `network.discover`,
-`network.scan` (see `core/scripting/stdlib.py`'s `MODULE_RUNNERS` — this
-is a third front-end over the exact same `run_*` coroutines the CLI, TUI,
-and REST API use, never a reimplementation). `VAR`, if given, holds a
+`network.scan`, `recon` (see `core/scripting/stdlib.py`'s
+`MODULE_RUNNERS` — NyxScript is one of several front-ends over the exact
+same `run_*` coroutines the CLI, TUI, REST API, MCP server, and GitHub
+Action use, never a reimplementation). `VAR`, if given, holds a
 `list[ModuleResult]` you can `save`, iterate with `foreach`, or inspect.
 
 ```
@@ -436,10 +440,28 @@ print validate.is_valid_domain("example.com")    # true
 | `math.nyx` | `mod(a, b)`, `clamp(x, lo, hi)`, `mean(list)`, `median(list)`, `gcd(a, b)`, `is_prime(n)` |
 | `dict.nyx` | `merge(a, b)`, `pick(d, keys)`, `invert(d)`, `from_pairs(pairs)` |
 | `validate.nyx` | `is_valid_port(v)`, `is_valid_ipv4(s)`, `is_valid_domain(s)` — conservative sanity checks, not full RFC parsers |
-| `collection.nyx` | `unique(list)`, `chunk(list, size)` |
+| `collection.nyx` | `unique(list)`, `chunk(list, size)`, `flatten(nested)`, `partition(list, pred)`, `take(list, n)`, `drop(list, n)`, `sum_by(list, fn)` |
 | `strings.nyx` | `title_case(s)`, `truncate(s, max_len)` |
+| `text.nyx` | `capitalize(s)`, `center(s, width, ch)`, `reverse(s)`, `contains_ignore_case(text, needle)`, `count_occurrences(text, needle)`, `is_blank(s)`, `words(s)`, `lines(s)`, `slugify(s)` |
 | `finding.nyx` | `count_by_severity(results, sev)`, `total_findings(results)`, `worst_severity(results)`, `summary_line(results, target)` |
 | `report.nyx` | `severity_breakdown(results)` (a dict of `severity -> count`), `print_summary(results, target)` (prints the summary line plus a `ui.table` breakdown) |
+| `asset.nyx` | `by_kind(assets, kind)`, `kinds(assets)`, `identifiers(assets)`, `count_by_kind(assets)`, `group_by_kind(assets)`, `attr(a, key, default)`, `has_attr(a, key)`, `has_source(a)`, `source_or(a, default)`, `summary_line(a)` |
+| `set.nyx` | `union(a, b)`, `intersect(a, b)`, `difference(a, b)`, `symmetric_difference(a, b)`, `is_subset(a, b)`, `is_disjoint(a, b)` |
+| `net.nyx` | `host_from_target(raw)`, `port_from_target(raw, default_port)`, `count_char(s, ch)`, `octets(s)`, `is_private_ipv4(s)` |
+| `format.nyx` | `pad_left(s, width, ch)`, `pad_right(s, width, ch)`, `human_bytes(n)`, `human_duration(seconds)`, `bullet_list(items)` |
+| `table.nyx` | `render(headers, rows)` — returns a plain-text table as a string |
+| `csv.nyx` | `parse_csv(text)`, `to_csv(rows)` |
+| `hash.nyx` | `short_hash(s, length)`, `fingerprint(parts)`, `has_changed(previous_hash, current_value)` |
+| `random.nyx` | `random_int(lo, hi)`, `choice(items)`, `shuffle(items)`, `sample(items, n)`, `jitter(base_seconds, spread)` |
+| `regex.nyx` | `extract_ips(text)`, `extract_emails(text)`, `extract_urls(text)`, `matches_any(text, patterns)` — built on the `regex_*` builtins below |
+| `time.nyx` | `elapsed(start)`, `is_older_than(start, max_age_seconds)`, `humanize(seconds)`, `now_iso()`, `backoff_delay(attempt, base_seconds)`, `time_it(fn)` |
+| `lambdas.nyx` | `identity`, `constant`, `compose`, `pipe`, `flip`, `partial`, `negate`, `any_of`, `all_of`, `none_of`, `count_where`, `find_where`, `flat_map`, `group_by`, `times` — functional-composition helpers on top of `map`/`filter`/`sort_by`/`reduce` |
+| `http.nyx` | `request(method, url, headers, body, timeout)`, `get(url, headers, timeout)`, `post(url, body, headers, timeout)`, `build_request(...)`, `parse_response(raw)` — a plain-text HTTP/1.1 client built on `socket.*` (`--unsafe` required) |
+| `ftp.nyx` | `connect(host, port)`, `login(...)`, `anonymous_login(conn)`, `pwd(conn)`, `cwd(conn, path)`, `set_binary_mode(conn)`, `set_ascii_mode(conn)`, `list(conn, path)`, `retr(conn, remote_path)`, `quit(conn)` — a minimal FTP client built on `socket.*` (`--unsafe` required) |
+
+`http.nyx` and `ftp.nyx` are themselves ordinary NyxScript — worked
+examples of `socket.*` (see below) built into working protocol clients,
+not special-cased by the interpreter.
 
 ## Built-in functions
 
@@ -468,6 +490,34 @@ Pure, synchronous, no I/O — safe to call anywhere, no `--unsafe` needed.
 | `zip` | `zip(list, list)` | → list of `[a, b]` pairs, stops at the shorter list |
 | `parse_json` | `parse_json(s)` | JSON → NyxScript value. Errors on `null` (no way to represent it) |
 | `to_json` | `to_json(value)` | NyxScript value → JSON string |
+| `now` | `now()` | current time as epoch seconds (`float`) |
+| `to_iso8601` | `to_iso8601(epoch_seconds)` | epoch seconds → an ISO-8601 UTC string |
+| `sha256` / `md5` | `sha256(s)` / `md5(s)` | hex digest of the UTF-8 encoding of `s`. `md5` is for fingerprinting/dedup keys only — there's no auth system here for its collision weaknesses to matter against |
+| `base64_encode` / `base64_decode` | `base64_encode(s)` / `base64_decode(s)` | standard base64, UTF-8 text in and out (no bytes type to hold arbitrary binary) |
+| `random` | `random()` | a `float` in `[0.0, 1.0)` — see [`lib/random.nyx`](#the-standard-library--lib) for `random_int`/`choice`/`shuffle`/etc. built on top of it |
+| `bytes_from_hex` / `bytes_to_hex` | `bytes_from_hex(s)` / `bytes_to_hex(list)` | hex string ↔ list of ints 0-255 |
+| `bytes_from_string` / `bytes_to_string` | `bytes_from_string(s)` / `bytes_to_string(list)` | UTF-8 string ↔ list of ints 0-255 |
+| `pack_uint16` / `pack_uint32` | `pack_uint16(n)` / `pack_uint32(n)` | unsigned int → big-endian list of 2/4 bytes |
+| `unpack_uint16` / `unpack_uint32` | `unpack_uint16(list)` / `unpack_uint32(list)` | big-endian list of exactly 2/4 bytes → unsigned int |
+| `checksum` | `checksum(list)` | RFC 1071 Internet checksum of a byte list |
+| `build_ip_header` | `build_ip_header(src_ip, dst_ip, protocol, payload[, ttl][, identification][, dont_fragment])` | RFC 791 IPv4 header (20 bytes, checksum included) as a byte list |
+| `build_tcp_header` | `build_tcp_header(src_ip, dst_ip, src_port, dst_port, seq, ack, flags, payload[, window])` | RFC 793 TCP header; `flags` is either an int or a comma-separated string like `"SYN,ACK"` |
+| `build_udp_header` | `build_udp_header(src_ip, dst_ip, src_port, dst_port, payload)` | RFC 768 UDP header |
+| `build_icmp_echo` | `build_icmp_echo(identifier, sequence, payload[, is_reply])` | RFC 792 ICMP echo request/reply |
+| `regex_match` | `regex_match(text, pattern)` | `bool` — does `pattern` match anywhere in `text` |
+| `regex_find` | `regex_find(text, pattern, default)` | the first match, or `default` if none (no `null` to fall back to implicitly) |
+| `regex_find_all` | `regex_find_all(text, pattern)` | list of all matches (capture groups become a list per match) |
+| `regex_replace` | `regex_replace(text, pattern, replacement)` | `text` with every match substituted |
+
+The `regex_*` builtins run in a persistent worker **process** (not a
+thread) with a 1-second wall-clock timeout per call — CPython's `re`
+engine never releases the GIL mid-match, so a catastrophic-backtracking
+pattern would otherwise freeze the whole interpreter rather than just
+error out. Input longer than 100,000 characters is rejected up front.
+The byte-list/packet-building functions above (`bytes_*`, `pack_*`,
+`checksum`, `build_*_header`) are pure, no I/O, and don't need
+`--unsafe` — only actually transmitting the result via `socket.raw_send`
+does (see [Raw sockets and packets](#raw-sockets-and-packets--socket)).
 
 See [Lambdas and higher-order functions](#lambdas-and-higher-order-functions)
 for `map`/`filter`/`sort_by`/`reduce`, which take a function value and so
@@ -541,11 +591,26 @@ everything `set` or `func`-defined earlier is still there on the next
 line. It's a scratchpad for trying out a snippet before it goes in a real
 `.nyx` file, not a replacement for `nyx script run`.
 
-## Escape hatches: `python:` and `pip`
+## Escape hatches: `unsafe`, `python:`, and `pip`
 
-Both are **disabled by default** and refuse to run without `--unsafe`
-(CLI) / the Unsafe toggle (TUI) — enabling either is an explicit,
-visible choice, not a silent default.
+All three are **disabled by default** and refuse to run without
+`--unsafe` (CLI) / the Unsafe toggle (TUI) — enabling any of them is an
+explicit, visible choice, not a silent default. `socket.*` (see below) is
+gated the same way.
+
+```
+unsafe
+```
+
+A bare `unsafe` statement flips the running script's own unsafe flag to
+`true` from that point on, for the rest of the script — a script can
+self-enable `python:`/`pip`/`socket.*` without the caller having passed
+`--unsafe` at all. This only works if the *caller* allows it: `nyx script
+run`/`nyx script repl`/the TUI allow it by default, but callers that need
+a hard ceiling regardless of script content — the MCP server, since an
+agent can submit arbitrary script text with no human confirming each
+call — construct the interpreter with that disabled, and a script's own
+`unsafe` statement is then refused outright rather than silently granted.
 
 ```
 pip "requests"
@@ -566,10 +631,50 @@ a NyxScript variable afterward, in that same scope. `pip` shells out to
 on `PATH`) as an argv list, never through a shell, so a package name
 can't smuggle in shell metacharacters.
 
-The linter still flags both with a warning (not an error — they're valid,
-just unsafe) and, past a `python:` block, stops checking for undefined
-variables in the rest of that scope, since it can't know what the block
-set.
+The linter still flags `python:`/`pip` with a warning (not an error —
+they're valid, just unsafe) and, past a `python:` block, stops checking
+for undefined variables in the rest of that scope, since it can't know
+what the block set.
+
+## Raw sockets and packets — `socket.*`
+
+Direct TCP/UDP access, gated behind `--unsafe` the same way as
+`python:`/`pip`: unlike `run dns`/`run tls`/`run http`/`network.discover`/
+`network.scan` — every one of which is a bounded, passive, read-only
+observation NYXOR can describe and score — a raw socket lets a script
+talk whatever protocol it wants to whatever host:port it wants.
+
+NyxScript has no bytes type, so data crosses this boundary either as a
+UTF-8 string or as a list of ints 0-255 — see `bytes_to_hex`/
+`bytes_from_hex`/`pack_uint16`/etc. in [Built-in functions](#built-in-functions)
+for building/parsing binary protocol messages out of that.
+
+| Function | Signature | Notes |
+|---|---|---|
+| `socket.connect` | `socket.connect(host, port[, protocol][, timeout])` | `protocol` is `"tcp"` (default) or `"udp"`; returns a connection handle |
+| `socket.connect_tls` | `socket.connect_tls(host, port[, timeout][, verify])` | TLS-wrapped TCP; `verify` defaults to `true` — `false` is an explicit, documented opt-out for a self-signed/invalid cert |
+| `socket.send` | `socket.send(handle, data)` | `data` is a string or a list of byte values; returns bytes sent |
+| `socket.recv` | `socket.recv(handle[, max_bytes][, timeout])` | returns a list of byte values (default `max_bytes` 4096); an empty list means "nothing arrived within the timeout", not an error |
+| `socket.recv_text` | `socket.recv_text(handle[, max_bytes][, timeout])` | like `socket.recv` but UTF-8-decoded to a string; errors if the bytes aren't valid UTF-8 |
+| `socket.close` | `socket.close(handle)` | closes a connection; every handle still open when the script ends is closed automatically |
+
+Every blocking call runs off the event loop with an explicit timeout, so
+a mistyped hostname or a silent host times out cleanly instead of
+hanging the whole interpreter.
+
+### Raw IP packets: `socket.raw_send` / `socket.raw_recv` / `socket.raw_read`
+
+| Function | Signature | Notes |
+|---|---|---|
+| `socket.raw_send` | `socket.raw_send(dst_ip, packet[, timeout])` | sends one complete IP packet (own IP header included, e.g. from `build_ip_header()`) via `IP_HDRINCL`. Needs root/administrator on Linux/macOS; **not usable on Windows** — the OS refuses `IP_HDRINCL` raw sockets outright, even for an administrator, a restriction in place since Windows XP SP2 |
+| `socket.raw_recv` | `socket.raw_recv(interface_ip[, timeout])` | opens a raw capture socket bound to a local interface; returns a handle. On Windows this flips `SIO_RCVALL` on (the standard sniffer technique) to see traffic beyond what's addressed to this host; elsewhere it only sees traffic addressed to that interface — capturing others' traffic additionally requires putting the NIC into promiscuous mode outside NyxScript, which this deliberately does not do as a side effect |
+| `socket.raw_read` | `socket.raw_read(handle[, max_bytes][, timeout])` | reads one captured IP packet (header included) off a `raw_recv` handle, as a list of byte values |
+
+Combine these with [`build_ip_header`/`build_tcp_header`/`build_udp_header`/
+`build_icmp_echo`/`checksum`](#built-in-functions) (pure, no `--unsafe`
+needed on their own — only sending the result via `socket.raw_send` is
+gated) to hand-craft packets to spec (RFC 791/793/768/792, checksums
+included).
 
 ## The linter
 
@@ -586,7 +691,8 @@ network access. It catches:
 - empty `if`/`foreach`/`while`/`func`/`try` bodies (warning)
 - a variable used after `try`/`except` that isn't guaranteed defined on
   every path that reaches it (see [Error handling](#error-handling--tryexcept))
-- `python:`/`pip` usage (warning — valid, but requires `--unsafe`)
+- `python:`/`pip`/`unsafe` usage (warning — valid, but requires
+  `--unsafe`, or self-granted by `unsafe` where the caller allows it)
 
 It does **not** catch: function-call arity mismatches (that's a runtime
 check, since it needs the actual call site), type errors (`"a" + 1`), or
@@ -619,7 +725,8 @@ statement      := set_stmt | index_set_stmt | if_stmt | foreach_stmt
                 | while_stmt | break_stmt | continue_stmt | func_stmt
                 | return_stmt | import_stmt | try_stmt | run_stmt
                 | save_stmt | print_stmt | sleep_stmt | assert_stmt
-                | fail_stmt | pip_stmt | python_block | expr_stmt | doc_stmt
+                | fail_stmt | pip_stmt | unsafe_stmt | python_block
+                | expr_stmt | doc_stmt
 
 set_stmt       := "set" IDENT "=" expr
 index_set_stmt := "set" IDENT index_suffix+ "=" expr
@@ -639,6 +746,7 @@ sleep_stmt     := "sleep" expr
 assert_stmt    := "assert" expr ("," expr)?
 fail_stmt      := "fail" expr
 pip_stmt       := "pip" expr
+unsafe_stmt    := "unsafe"                        # self-enables --unsafe features for the rest of the script
 python_block   := "python:" <raw source lines> "end"
 expr_stmt      := call_expr                      # a call used for its side effect
 doc_stmt       := STRING                          # a docstring — a no-op at run time
@@ -676,3 +784,9 @@ consumes it as its own postfix step instead. Both paths end up calling the
 same member-lookup code, so they behave identically; two mechanisms exist
 only because ripping out the older one would break the existing
 `run network.discover`-style module-name convention.
+
+`STRING` covers both ordinary (`"..."`/`'...'`, escapes and `{expr}`
+interpolation) and raw (`r"..."`/`r'...'`, no escapes or interpolation
+beyond `\"`/`\'` so the string can still end) literals — the lexer
+distinguishes them by the `r` prefix, but both produce the same token
+type to the parser.

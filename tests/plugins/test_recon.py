@@ -43,39 +43,25 @@ async def test_crtsh_subdomains_excludes_other_domains(monkeypatch: pytest.Monke
     assert "unrelated-domain.org" not in names
 
 
-async def test_crtsh_subdomains_returns_empty_set_on_network_failure(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "network-failure",
+        "bad-json",
+        # crt.sh (or a proxy in front of it) can return valid JSON that isn't
+        # a list of certificate entries, e.g. a rate-limit response like
+        # {"error": "..."} — this must not crash the whole recon run.
+        "well-formed-but-unexpected-json",
+    ],
+)
+async def test_crtsh_subdomains_returns_empty_set_on_failure_modes(
+    monkeypatch: pytest.MonkeyPatch, mode: str
 ) -> None:
     async def fake_get(self, url, params=None, **kwargs):  # noqa: ANN001
-        raise httpx.ConnectError("no route to host")
-
-    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
-
-    names = await crtsh_subdomains("example.com")
-
-    assert names == set()
-
-
-async def test_crtsh_subdomains_returns_empty_set_on_bad_json(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    async def fake_get(self, url, params=None, **kwargs):  # noqa: ANN001
-        return httpx.Response(200, text="not json", request=httpx.Request("GET", url))
-
-    monkeypatch.setattr(httpx.AsyncClient, "get", fake_get)
-
-    names = await crtsh_subdomains("example.com")
-
-    assert names == set()
-
-
-async def test_crtsh_subdomains_returns_empty_set_on_well_formed_but_unexpected_json(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    # crt.sh (or a proxy in front of it) can return valid JSON that isn't a
-    # list of certificate entries, e.g. a rate-limit response like
-    # {"error": "..."} — this must not crash the whole recon run.
-    async def fake_get(self, url, params=None, **kwargs):  # noqa: ANN001
+        if mode == "network-failure":
+            raise httpx.ConnectError("no route to host")
+        if mode == "bad-json":
+            return httpx.Response(200, text="not json", request=httpx.Request("GET", url))
         return httpx.Response(
             200, json={"error": "rate limited"}, request=httpx.Request("GET", url)
         )

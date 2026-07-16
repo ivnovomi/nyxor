@@ -1,10 +1,9 @@
-"""The object every plugin command receives: shared config, logging, events
-and output preferences for the current invocation.
+"""The object every plugin command receives: shared config, logging, and
+output preferences for the current invocation.
 
 Passing this explicitly (rather than reaching for globals) is what keeps
 modules independently testable — a test can construct a ``NyxorContext``
-pointed at a temp directory and an in-memory event bus without touching the
-real CLI.
+pointed at a temp directory without touching the real CLI.
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ from rich.console import Console
 from structlog.stdlib import BoundLogger
 
 from nyxor.core.config import NyxorConfig
-from nyxor.core.events import EventBus
 from nyxor.core.logging import get_logger
 
 
@@ -32,7 +30,6 @@ class OutputOptions:
 @dataclass
 class NyxorContext:
     config: NyxorConfig
-    events: EventBus = field(default_factory=EventBus)
     console: Console = field(default_factory=Console)
     error_console: Console = field(default_factory=lambda: Console(stderr=True))
     output: OutputOptions = field(default_factory=OutputOptions)

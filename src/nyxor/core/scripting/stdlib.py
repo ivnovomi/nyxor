@@ -1,8 +1,8 @@
 """The modules a NyxScript ``run`` statement can call.
 
-Every entry wraps one of the domain plugins' ``run_*`` coroutines (see
-docs/architecture.md § "One scan, two front-ends") — NyxScript is a third
-front-end over the same logic, not a reimplementation of it.
+Every entry wraps one of the domain plugins' ``run_*`` coroutines — NyxScript
+is one of several front-ends over the same logic (alongside the CLI, TUI,
+REST API, MCP server, and GitHub Action), not a reimplementation of it.
 """
 
 from __future__ import annotations

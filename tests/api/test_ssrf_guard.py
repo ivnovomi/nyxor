@@ -6,6 +6,7 @@ import socket
 import pytest
 
 from nyxor.api.app import _ensure_public_target, _hostname_from_target
+from tests._http_mocks import FakeStream
 
 
 @pytest.mark.parametrize(
@@ -105,19 +106,9 @@ async def test_dns_rebinding_cannot_bypass_the_guard_via_a_second_resolution(
 
     seen_requests: list[tuple[str, dict]] = []
 
-    class _FakeStream:
-        def __init__(self, response: httpx.Response) -> None:
-            self._response = response
-
-        async def __aenter__(self) -> httpx.Response:
-            return self._response
-
-        async def __aexit__(self, *exc_info: object) -> None:
-            return None
-
     def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
         seen_requests.append((str(url), kwargs))
-        return _FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
+        return FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
 
     monkeypatch.setattr(httpx.AsyncClient, "stream", fake_stream)
 
@@ -146,20 +137,10 @@ def test_http_endpoint_rejects_a_redirect_to_a_metadata_ip(nyxor_test_client, mo
     # caller typed in.
     import httpx
 
-    class _FakeStream:
-        def __init__(self, response: httpx.Response) -> None:
-            self._response = response
-
-        async def __aenter__(self) -> httpx.Response:
-            return self._response
-
-        async def __aexit__(self, *exc_info: object) -> None:
-            return None
-
     def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
         if "169.254.169.254" in str(url):
-            return _FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
-        return _FakeStream(
+            return FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
+        return FakeStream(
             httpx.Response(
                 302,
                 headers={"location": "http://169.254.169.254/latest/meta-data/"},

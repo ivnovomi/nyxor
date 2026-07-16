@@ -2,8 +2,8 @@
 
 This module is intentionally thin: it wires global options, loads
 configuration, discovers plugins, and hands control to them. It has no
-knowledge of what ``nyx network`` or ``nyx dns`` actually do — see
-docs/architecture.md.
+knowledge of what ``nyx network`` or ``nyx dns`` actually do — see the
+"Architecture" wiki page.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from nyxor.core.banner import boot_sequence
 from nyxor.core.config import load_config
 from nyxor.core.context import NyxorContext, OutputOptions
 from nyxor.core.errors import NyxorError
-from nyxor.core.events import EventBus
 from nyxor.core.logging import configure_logging, get_logger
 from nyxor.core.plugins import discover_plugins
 
@@ -109,7 +108,6 @@ def main_callback(
     output_format = "json" if json_output else "yaml" if yaml_output else "table"
     ctx.obj = NyxorContext(
         config=config,
-        events=EventBus(),
         output=OutputOptions(format=output_format, output_path=output, verbose=verbose),
     )
 

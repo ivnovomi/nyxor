@@ -45,8 +45,8 @@ For people who scroll instead of read:
   named panels (Scanning, AI, Automation, ...) instead of one giant
   alphabet-soup list.
 - **Built with Claude Code as a pair-programmer** — no secret about it,
-  see [how](docs/contributing.md#how-this-project-is-built). Judge it by
-  the tests and whether it actually works, same as any other project.
+  see [how](https://github.com/ivnovomi/nyxor/wiki/Contributing#how-this-project-is-built).
+  Judge it by the tests and whether it actually works, same as any other project.
 
 Not convinced yet? Keep scrolling — there's a Matrix-rain easter egg
 (`nyx matrix`) that does absolutely nothing useful and we kept it anyway.
@@ -609,10 +609,10 @@ looking. Local-AI settings (`ai.ollama_host`, `ai.model`) live in there too.
 
 ## Architecture
 
-See [docs/architecture.md](docs/architecture.md) for how the Core, plugin
-system, and reporting framework fit together, and
-[docs/plugin-development.md](docs/plugin-development.md) to add your own
-module without touching the Core.
+See the [Architecture wiki page](https://github.com/ivnovomi/nyxor/wiki/Architecture)
+for how the Core, plugin system, and reporting framework fit together, and
+[Plugin Development](https://github.com/ivnovomi/nyxor/wiki/Plugin-Development)
+to add your own module without touching the Core.
 
 ## Testing
 
@@ -628,6 +628,6 @@ the badge at the top of this file.
 
 ## Contributing
 
-See [docs/contributing.md](docs/contributing.md). Cutting a release (PyPI
-and the GitHub Action's version tag) is documented separately in
-[docs/publishing.md](docs/publishing.md).
+See the [Contributing wiki page](https://github.com/ivnovomi/nyxor/wiki/Contributing).
+Cutting a release (PyPI and the GitHub Action's version tag) is documented
+separately in [docs/publishing.md](docs/publishing.md).

@@ -35,12 +35,9 @@ docs/
    hierarchy — see [FAQ § Configuration](FAQ-Troubleshooting#configuration).
 3. **Plugin loader** (`core/plugins.py`) — discovers plugins via the
    `nyxor.plugins` Python entry-point group. No central registry file.
-4. **Event system** (`core/events.py`) — an in-process pub/sub bus so
-   plugins can react to scan lifecycle events without coupling to each
-   other.
-5. **Logging** (`core/logging.py`) — `structlog`-based, Rich console or
+4. **Logging** (`core/logging.py`) — `structlog`-based, Rich console or
    JSON.
-6. **Shared interfaces** (`core/interfaces.py`, `core/models.py`) — the
+5. **Shared interfaces** (`core/interfaces.py`, `core/models.py`) — the
    `Plugin` protocol and the `Finding` / `Asset` / `ModuleResult` data
    models every module returns.
 7. **Reporting framework** (`core/reporting/`) — renders a

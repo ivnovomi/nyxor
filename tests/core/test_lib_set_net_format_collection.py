@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from nyxor.core.config import load_config
 from nyxor.core.scripting import lint_source, run_script
 
@@ -68,26 +70,20 @@ print set.is_disjoint([1, 2], [2, 3])
 # ---------- lib/net.nyx ----------
 
 
-async def test_host_from_target_handles_a_full_url() -> None:
-    lines = await _run('print net.host_from_target("https://example.com:8443/path")\n')
-    assert lines == ["example.com"]
-
-
-async def test_host_from_target_handles_host_port() -> None:
-    lines = await _run('print net.host_from_target("example.com:443")\n')
-    assert lines == ["example.com"]
-
-
-async def test_host_from_target_handles_bracketed_ipv6() -> None:
-    lines = await _run('print net.host_from_target("[::1]:443")\n')
-    assert lines == ["::1"]
-
-
-async def test_host_from_target_passes_through_a_bare_ipv6_literal() -> None:
-    # A bare (unbracketed) IPv6 address has multiple colons, so it must not
-    # be mistaken for a host:port pair and truncated at the first one.
-    lines = await _run('print net.host_from_target("2001:4860:4860::8888")\n')
-    assert lines == ["2001:4860:4860::8888"]
+@pytest.mark.parametrize(
+    ("target", "expected"),
+    [
+        pytest.param("https://example.com:8443/path", "example.com", id="full-url"),
+        pytest.param("example.com:443", "example.com", id="host-port"),
+        pytest.param("[::1]:443", "::1", id="bracketed-ipv6"),
+        # A bare (unbracketed) IPv6 address has multiple colons, so it must
+        # not be mistaken for a host:port pair and truncated at the first one.
+        pytest.param("2001:4860:4860::8888", "2001:4860:4860::8888", id="bare-ipv6-passthrough"),
+    ],
+)
+async def test_host_from_target(target: str, expected: str) -> None:
+    lines = await _run(f'print net.host_from_target("{target}")\n')
+    assert lines == [expected]
 
 
 async def test_port_from_target_parses_a_valid_port() -> None:
@@ -100,39 +96,25 @@ async def test_port_from_target_falls_back_to_the_default() -> None:
     assert lines == ["443"]
 
 
-async def test_is_private_ipv4_flags_rfc1918_and_loopback() -> None:
-    lines = await _run(
-        """
-print net.is_private_ipv4("10.0.0.5")
-print net.is_private_ipv4("192.168.1.1")
-print net.is_private_ipv4("127.0.0.1")
-print net.is_private_ipv4("169.254.1.1")
-print net.is_private_ipv4("172.20.0.1")
-"""
-    )
-    assert lines == ["true", "true", "true", "true", "true"]
-
-
-async def test_is_private_ipv4_is_precise_about_the_172_range() -> None:
-    # 172.16.0.0/12 only covers the second octet 16-31 — a naive "starts
-    # with 172" check would wrongly flag 172.10.x.x or 172.32.x.x as private.
-    lines = await _run(
-        """
-print net.is_private_ipv4("172.10.0.1")
-print net.is_private_ipv4("172.32.0.1")
-"""
-    )
-    assert lines == ["false", "false"]
-
-
-async def test_is_private_ipv4_rejects_public_addresses() -> None:
-    lines = await _run('print net.is_private_ipv4("8.8.8.8")\n')
-    assert lines == ["false"]
-
-
-async def test_is_private_ipv4_rejects_a_malformed_address() -> None:
-    lines = await _run('print net.is_private_ipv4("not-an-ip")\n')
-    assert lines == ["false"]
+@pytest.mark.parametrize(
+    ("addr", "expected"),
+    [
+        pytest.param("10.0.0.5", "true", id="rfc1918-10"),
+        pytest.param("192.168.1.1", "true", id="rfc1918-192-168"),
+        pytest.param("127.0.0.1", "true", id="loopback"),
+        pytest.param("169.254.1.1", "true", id="link-local"),
+        pytest.param("172.20.0.1", "true", id="172-in-range"),
+        # 172.16.0.0/12 only covers the second octet 16-31 — a naive "starts
+        # with 172" check would wrongly flag 172.10.x.x or 172.32.x.x as private.
+        pytest.param("172.10.0.1", "false", id="172-below-range"),
+        pytest.param("172.32.0.1", "false", id="172-above-range"),
+        pytest.param("8.8.8.8", "false", id="public"),
+        pytest.param("not-an-ip", "false", id="malformed"),
+    ],
+)
+async def test_is_private_ipv4(addr: str, expected: str) -> None:
+    lines = await _run(f'print net.is_private_ipv4("{addr}")\n')
+    assert lines == [expected]
 
 
 # ---------- lib/format.nyx ----------

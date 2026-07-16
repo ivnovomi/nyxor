@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from urllib.parse import urlsplit
 
 import typer
 from rich.markup import escape as escape_markup
@@ -21,6 +20,7 @@ from nyxor.core.context import NyxorContext
 from nyxor.core.explain import explain
 from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import ModuleResult, Severity
+from nyxor.core.netparse import split_host_port
 from nyxor.core.output import SEVERITY_STYLE, emit_results
 from nyxor.core.scoring import render_badge, render_terminal_badge, score_results
 from nyxor.plugins.analyze.advisor import dumber_writeup, fix_suggestions
@@ -41,13 +41,8 @@ def _hostname_for_dns(domain: str) -> str:
     "https://example.com/" as a domain name doesn't, so pull the host back
     out of it first.
     """
-    if "://" in domain:
-        return urlsplit(domain).hostname or domain
-    if domain.startswith("[") and "]" in domain:
-        return domain[1 : domain.index("]")]
-    if domain.count(":") == 1:
-        return domain.split(":", 1)[0]
-    return domain
+    host, _ = split_host_port(domain, default_port=443)
+    return host
 
 
 async def run_audit(
