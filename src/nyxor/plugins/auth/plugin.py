@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 
-import httpx
+import httpx2 as httpx
 import typer
 
 from nyxor.core.context import NyxorContext
