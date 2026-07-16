@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-import httpx
+import httpx2 as httpx
 
 from nyxor.plugins.http_.fingerprint import fingerprint
 

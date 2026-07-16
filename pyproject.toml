@@ -26,7 +26,12 @@ dependencies = [
     "platformdirs>=4.3.6",
     "tomli-w>=1.1.0",
     "dnspython>=2.7.0",
-    "httpx>=0.28.1",
+    # httpx2 is Pydantic's actively maintained continuation of httpx (see
+    # https://github.com/pydantic/httpx2) — same API, same httpcore-level
+    # extensions (including the `sni_hostname` request extension the SSRF
+    # guard's IP-pinning depends on, see plugins/http_/inspector.py), timely
+    # security patches. httpx itself sees limited activity these days.
+    "httpx2>=2.7.0",
     "cryptography>=44.0.0",
     "jinja2>=3.1.4",
     "pyyaml>=6.0.2",
@@ -44,10 +49,6 @@ dev = [
     "ruff>=0.8.4",
     "types-pyyaml>=6.0.12",
     "types-psutil>=6.0.0",
-    # starlette.testclient (used by our FastAPI tests) prefers httpx2 and
-    # emits a deprecation warning without it — test-harness-only, does not
-    # touch the runtime httpx client the SSRF guard relies on.
-    "httpx2>=2.7.0",
 ]
 lsp = [
     "pygls>=1.3.0",

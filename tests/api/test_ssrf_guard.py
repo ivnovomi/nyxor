@@ -87,7 +87,7 @@ async def test_dns_rebinding_cannot_bypass_the_guard_via_a_second_resolution(
     # actual connection would normally trigger on its own — with a private
     # one. If the connection re-resolves the hostname instead of reusing
     # the address this check already validated, the attacker wins.
-    import httpx
+    import httpx2 as httpx
 
     from nyxor.plugins.http_.inspector import inspect
 
@@ -135,7 +135,7 @@ def test_http_endpoint_rejects_a_redirect_to_a_metadata_ip(nyxor_test_client, mo
     # server it points at 302s to the cloud metadata address — the SSRF
     # guard must also apply to redirect hops, not just the request the
     # caller typed in.
-    import httpx
+    import httpx2 as httpx
 
     def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
         if "169.254.169.254" in str(url):

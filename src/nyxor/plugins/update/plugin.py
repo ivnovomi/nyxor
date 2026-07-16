@@ -23,7 +23,7 @@ def _update(ctx: typer.Context) -> None:
 
     latest: str | None = None
     try:
-        import httpx
+        import httpx2 as httpx
 
         response = httpx.get(PYPI_URL, timeout=5.0)
         response.raise_for_status()

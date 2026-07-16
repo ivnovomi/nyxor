@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 
-import httpx
+import httpx2 as httpx
 
 VT_FILE_URL = "https://www.virustotal.com/api/v3/files/{sha256}"
 _MAX_HASH_BYTES = 200 * 1024 * 1024

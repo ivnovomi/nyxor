@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import httpx
+import httpx2 as httpx
 import pytest
 
 from nyxor.plugins.http_.inspector import _pin_url_to_ip, inspect
