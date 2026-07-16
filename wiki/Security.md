@@ -97,6 +97,15 @@ redirect hop** — the callback is only wired up by the API layer, so the
 CLI/TUI/NyxScript (meant to be able to target internal hosts on
 purpose) are unaffected.
 
+It was also bypassable via DNS rebinding: validating a hostname and
+then letting the HTTP/TLS client resolve it *again* to actually connect
+are two independent DNS lookups, and a short-TTL nameserver can answer
+the first with a public address and the second with a private one.
+Fixed by having `validate_url` return the specific IP it validated and
+pinning the actual connection to it (`Host`/SNI override for HTTP, a
+direct-IP dial for TLS) instead of letting the connection re-resolve
+the hostname on its own — closed for `/http`, `/tls`, and `/audit`.
+
 ## XSS fixes this project shipped and fixed
 
 Two reflected-XSS issues were found and fixed in the REST API during a

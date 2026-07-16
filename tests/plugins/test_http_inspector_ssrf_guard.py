@@ -3,7 +3,17 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from nyxor.plugins.http_.inspector import inspect
+from nyxor.plugins.http_.inspector import _pin_url_to_ip, inspect
+
+
+def test_pin_url_to_ip_fails_fast_on_a_url_with_no_hostname() -> None:
+    # _pin_url_to_ip is only ever called with a pinned IP already in hand,
+    # which itself only happens after validate_url resolved a hostname out
+    # of this same URL -- a missing hostname here means that invariant
+    # broke, and this should fail loudly rather than silently send a
+    # request with a blank Host header.
+    with pytest.raises(ValueError, match="no hostname"):
+        _pin_url_to_ip("not-a-real-url", "93.184.216.34")
 
 
 class _FakeStream:

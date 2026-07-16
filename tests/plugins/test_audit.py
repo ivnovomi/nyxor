@@ -41,7 +41,9 @@ async def test_run_audit_resolves_a_bare_hostname_for_dns_given_a_full_url(
         seen_dns_target = domain
         return ModuleResult(module="dns.lookup", target=domain)
 
-    async def fake_tls_run_inspect(target: str, timeout: float) -> ModuleResult:
+    async def fake_tls_run_inspect(
+        target: str, timeout: float, *, validate_url: object = None
+    ) -> ModuleResult:
         return ModuleResult(module="tls.inspect", target=target)
 
     async def fake_http_run_inspect(

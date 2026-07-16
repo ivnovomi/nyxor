@@ -108,7 +108,9 @@ def create_app(config: NyxorConfig | None = None) -> FastAPI:
     @limiter.limit(SCAN_RATE_LIMIT)
     async def tls(request: Request, target: str) -> ModuleResult:
         await _ensure_public_target(target)
-        return await tls_run_inspect(target, config.tls.timeout_seconds)
+        return await tls_run_inspect(
+            target, config.tls.timeout_seconds, validate_url=_ensure_public_target
+        )
 
     @app.get("/http", response_model=ModuleResult)
     @limiter.limit(SCAN_RATE_LIMIT)
@@ -274,17 +276,30 @@ def _reject_if_unsafe_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address, host
         )
 
 
-async def _ensure_public_target(raw: str) -> None:
-    """Block SSRF: refuse to scan loopback/private/link-local/metadata addresses.
+async def _ensure_public_target(raw: str) -> str | None:
+    """Block SSRF: refuse to scan loopback/private/link-local/metadata addresses,
+
+    and return a specific validated IP for the caller to pin the actual
+    connection to (or ``None`` if ``raw``'s host is already a literal
+    address, which needs no pinning — there's no DNS resolution involved in
+    connecting straight to it).
 
     This API is meant to audit *other people's* infrastructure over the public
     internet — without this check, ``/http?url=http://169.254.169.254/...`` or
     ``/tls/127.0.0.1:6379`` would turn an internet-facing NYXOR instance into a
     generic internal-network probe for anyone who can reach it.
+
+    Returning (and having callers pin to) a specific address, rather than
+    just validating and discarding it, closes a DNS-rebinding TOCTOU: this
+    check and the connection that follows would otherwise be two
+    independent DNS lookups, and an attacker's nameserver can answer the
+    first with a public address and the second — with a very short TTL —
+    with a private one, sailing straight past a validate-then-reconnect
+    guard.
     """
     hostname = _hostname_from_target(raw)
     if not hostname:
-        return
+        return None
 
     try:
         ip = ipaddress.ip_address(hostname)
@@ -293,16 +308,21 @@ async def _ensure_public_target(raw: str) -> None:
 
     if ip is not None:
         _reject_if_unsafe_ip(ip, hostname)
-        return
+        return None  # already a literal address -- nothing to pin
 
     try:
         loop = asyncio.get_running_loop()
         infos = await loop.getaddrinfo(hostname, None)
     except OSError:
-        return  # let the actual scan surface the resolution failure
+        return None  # let the actual scan surface the resolution failure
 
+    pinned: str | None = None
     for info in infos:
-        _reject_if_unsafe_ip(ipaddress.ip_address(info[4][0]), hostname)
+        candidate = ipaddress.ip_address(info[4][0])
+        _reject_if_unsafe_ip(candidate, hostname)
+        if pinned is None:
+            pinned = str(candidate)
+    return pinned
 
 
 def _score_payload(domain: str, score: SecurityScore) -> dict[str, object]:
