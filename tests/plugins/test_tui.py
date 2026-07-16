@@ -121,3 +121,40 @@ async def test_a_finding_title_containing_brackets_does_not_crash_the_scan_tab(
         assert scan_table.row_count == 1
         status = app.query_one("#scan-status")
         assert "Error" not in str(status.render())
+
+
+@pytest.mark.asyncio
+async def test_an_asset_identifier_containing_brackets_does_not_crash_the_inventory_tab(
+    tmp_path,
+) -> None:
+    # asset.identifier can hold target-controlled data (e.g. a raw DNS TXT
+    # record) that may contain square brackets — same DataTable markup-
+    # parsing hazard as finding.title/description on the Scan tab.
+    from rich.markup import escape as escape_markup
+    from rich.text import Text
+    from textual.coordinate import Coordinate
+
+    from nyxor.core.models import Asset
+    from nyxor.plugins.inventory.store import InventoryStore
+
+    identifier = "weird [id] value"
+    app = NyxorApp()
+    app.inventory = InventoryStore(path=tmp_path / "inventory.json")
+    app.inventory.add([Asset(kind="dns:txt", identifier=identifier, source_module="dns.lookup")])
+
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        app.refresh_inventory()
+
+        inventory_table = app.query_one("#inventory-table", DataTable)
+        assert inventory_table.row_count == 1
+        # The identifier column is index 1 (kind, identifier, source, discovered_at).
+        # DataTable stores the pre-render cell value, i.e. the escape_markup()'d
+        # string ("weird \[id] value") — Rich only resolves that escape into a
+        # literal "[" when it's actually rendered. Round-tripping the stored
+        # value back through Text.from_markup (what DataTable itself does at
+        # paint time) proves it displays as the original, unmangled text
+        # rather than being corrupted or exploded into extra cells.
+        identifier_cell = str(inventory_table.get_cell_at(Coordinate(0, 1)))
+        assert identifier_cell == escape_markup(identifier)
+        assert Text.from_markup(identifier_cell).plain == identifier

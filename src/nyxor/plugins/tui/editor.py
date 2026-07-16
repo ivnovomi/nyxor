@@ -343,10 +343,17 @@ class NyxScriptEditor(TextArea):
                 out[alias] = cached[1]
                 continue
 
-            lib_program = parse_best_effort(target.read_text(encoding="utf-8"))
-            if lib_program is None:
-                continue
-            functions = sorted(top_level_functions(lib_program))
+            try:
+                content = target.read_text(encoding="utf-8")
+                lib_program = parse_best_effort(content)
+            except (OSError, UnicodeDecodeError):
+                lib_program = None
+
+            # Cache the result either way — including a syntax error in the
+            # imported file (lib_program is None) — or an editor actively
+            # mid-edit on a broken import would re-read and re-parse it on
+            # every single keystroke, defeating the point of this cache.
+            functions = sorted(top_level_functions(lib_program)) if lib_program else []
             cache[target] = (mtime, functions)
             out[alias] = functions
         return out

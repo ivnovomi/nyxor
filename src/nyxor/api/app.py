@@ -195,7 +195,22 @@ def _require_loopback_caller(request: Request) -> None:
     on a non-loopback interface for scanning still keeps approval local
     (e.g. via an SSH tunnel) rather than open to anyone who can reach the
     API.
+
+    Checking the TCP peer address alone isn't enough: DNS rebinding lets an
+    attacker's page get a browser to genuinely connect to 127.0.0.1 (the
+    ``request.client.host`` check below would pass) while the browser still
+    sends ``Host: attacker.com``, because that's the domain the page was
+    loaded from — the attacker's JavaScript never sees a cross-origin error,
+    since as far as the browser's Same-Origin Policy is concerned nothing
+    crossed an origin. Requiring the Host header to actually say localhost
+    closes that gap.
     """
+    if request.url.hostname not in ("127.0.0.1", "localhost", "::1"):
+        raise HTTPException(
+            status_code=403,
+            detail="invalid Host header — device-flow approval must be requested as localhost",
+        )
+
     host = request.client.host if request.client else None
     try:
         ip = ipaddress.ip_address(host) if host else None

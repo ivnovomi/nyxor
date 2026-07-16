@@ -42,6 +42,8 @@ async def crtsh_subdomains(domain: str, timeout: float = 15.0) -> set[str]:
         if not isinstance(entry, dict):
             continue
         raw = entry.get("name_value", "")
+        if not isinstance(raw, str):
+            continue
         for name in raw.splitlines():
             name = name.strip().lower()
             if not name or name.startswith("*."):

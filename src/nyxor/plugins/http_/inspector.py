@@ -48,6 +48,12 @@ async def _read_capped_body(response: httpx.Response) -> bytes:
     chunks: list[bytes] = []
     total = 0
     async for chunk in response.aiter_bytes():
+        remaining = MAX_BODY_BYTES - total
+        if remaining <= 0:
+            break
+        if len(chunk) > remaining:
+            chunks.append(chunk[:remaining])
+            break
         chunks.append(chunk)
         total += len(chunk)
         if total >= MAX_BODY_BYTES:

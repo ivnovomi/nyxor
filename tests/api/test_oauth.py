@@ -93,6 +93,7 @@ def test_tokens_expire_after_their_ttl() -> None:
     token = store.poll(auth.device_code)
     assert store.is_valid_token(token)
 
-    store._valid_tokens[token] = time.monotonic() - oauth_module.TOKEN_TTL_SECONDS - 1
+    token_hash = oauth_module._hash_token(token)
+    store._valid_tokens[token_hash] = time.monotonic() - oauth_module.TOKEN_TTL_SECONDS - 1
 
     assert store.is_valid_token(token) is False

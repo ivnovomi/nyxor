@@ -15,7 +15,7 @@ single-operator instance.
 
 from __future__ import annotations
 
-import hmac
+import hashlib
 import secrets
 import string
 import time
@@ -30,6 +30,22 @@ _USER_CODE_ALPHABET = "".join(sorted(set(string.ascii_uppercase) - set("ILOU")))
 def _new_user_code() -> str:
     chars = [secrets.choice(_USER_CODE_ALPHABET) for _ in range(8)]
     return f"{''.join(chars[:4])}-{''.join(chars[4:])}"
+
+
+def _hash_token(token: str) -> str:
+    """SHA-256 of a bearer token, used as the storage/lookup key.
+
+    Storing (and comparing) the hash instead of the raw token keeps
+    ``is_valid_token`` an O(1) dict lookup — comparing the presented token
+    against every stored one with ``hmac.compare_digest`` in a loop is O(N)
+    in the number of live tokens, letting an attacker force an ever-growing
+    linear scan on every request as tokens accumulate over their 30-day TTL.
+    A hash-table lookup on a fixed-length digest doesn't have that
+    scaling problem, and the token itself (32 random bytes) is far too
+    high-entropy for a timing side channel on the hash comparison to be a
+    practical concern.
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 @dataclass
@@ -96,7 +112,7 @@ class DeviceAuthStore:
             raise OAuthError("expired_token", "this code has expired")
         auth.status = "approved"
         auth.access_token = secrets.token_urlsafe(32)
-        self._valid_tokens[auth.access_token] = time.monotonic()
+        self._valid_tokens[_hash_token(auth.access_token)] = time.monotonic()
         return auth
 
     def poll(self, device_code: str) -> str:
@@ -120,10 +136,7 @@ class DeviceAuthStore:
 
     def is_valid_token(self, token: str) -> bool:
         self._sweep_expired()
-        # Constant-time membership check: a plain `in` on a dict/set short-circuits
-        # on the first differing byte of each candidate key's hash bucket, which is
-        # a (largely theoretical, but free to close) timing side channel.
-        return any(hmac.compare_digest(token, candidate) for candidate in self._valid_tokens)
+        return _hash_token(token) in self._valid_tokens
 
 
 # One store per API process — created once in create_app() and closed over
