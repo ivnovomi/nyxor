@@ -2,7 +2,7 @@
   "name": "nyxscript",
   "displayName": "NyxScript",
   "description": "Syntax highlighting, linting, and completion for NyxScript (.nyx) — NYXOR's automation language.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "nyxor",
   "license": "MIT",
   "icon": "icons/nyxscript.png",

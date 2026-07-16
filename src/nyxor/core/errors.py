@@ -29,9 +29,5 @@ class PluginNotFoundError(PluginError):
     """Raised when a requested plugin name is not registered."""
 
 
-class ModuleExecutionError(NyxorError):
-    """Raised when a module (e.g. network, dns, tls, http) fails to run."""
-
-
 class ReportError(NyxorError):
     """Raised when report generation or serialization fails."""

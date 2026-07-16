@@ -22,7 +22,6 @@ dependencies = [
     "typer>=0.15.1",
     "rich>=13.9.4",
     "pydantic>=2.10.3",
-    "pydantic-settings>=2.7.0",
     "structlog>=24.4.0",
     "platformdirs>=4.3.6",
     "tomli-w>=1.1.0",
@@ -45,6 +44,10 @@ dev = [
     "ruff>=0.8.4",
     "types-pyyaml>=6.0.12",
     "types-psutil>=6.0.0",
+    # starlette.testclient (used by our FastAPI tests) prefers httpx2 and
+    # emits a deprecation warning without it — test-harness-only, does not
+    # touch the runtime httpx client the SSRF guard relies on.
+    "httpx2>=2.7.0",
 ]
 lsp = [
     "pygls>=1.3.0",
@@ -64,7 +67,7 @@ nyx = "nyxor.core.cli:main"
 
 # Built-in plugins register through the same entry-point group that third
 # party plugins use. The Core does not know about any plugin by name — it
-# only knows how to discover this group. See docs/plugin-development.md.
+# only knows how to discover this group. See the "Plugin Development" wiki page.
 [project.entry-points."nyxor.plugins"]
 system = "nyxor.plugins.system.plugin:PLUGIN"
 config = "nyxor.plugins.config_cmd.plugin:PLUGIN"

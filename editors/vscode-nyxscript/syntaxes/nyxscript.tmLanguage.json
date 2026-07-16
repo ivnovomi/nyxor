@@ -12,6 +12,7 @@
     { "include": "#function-def" },
     { "include": "#keywords" },
     { "include": "#ui-functions" },
+    { "include": "#socket-functions" },
     { "include": "#modules" },
     { "include": "#builtin-functions" },
     { "include": "#function-call" },
@@ -112,7 +113,7 @@
       "name": "constant.language.boolean.nyxscript"
     },
     "keywords": {
-      "match": "\\b(set|if|else|end|foreach|while|break|continue|func|return|import|try|except|lambda|in|run|as|to|save|print|sleep|assert|fail|pip|and|or|not)\\b",
+      "match": "\\b(set|if|else|end|foreach|while|break|continue|func|return|import|try|except|lambda|in|run|as|to|save|print|sleep|assert|fail|pip|pyblock|unsafe|and|or|not)\\b",
       "name": "keyword.control.nyxscript"
     },
     "function-def": {
@@ -130,8 +131,12 @@
       "match": "\\b(ui)\\.(confirm|input|select|table|banner|status)\\b",
       "name": "support.function.builtin.nyxscript"
     },
+    "socket-functions": {
+      "match": "\\b(socket)\\.(connect_tls|connect|send|recv_text|recv|raw_send|raw_recv|raw_read|close)\\b",
+      "name": "support.function.builtin.nyxscript"
+    },
     "builtin-functions": {
-      "match": "\\b(len|range|upper|lower|strip|split|join|contains|str|int|float|abs|round|sorted|reversed|min|max|sum|type_of|keys|values|items|get|replace|starts_with|ends_with|find|zip|parse_json|to_json|map|filter|sort_by|reduce)\\b(?=\\s*\\()",
+      "match": "\\b(len|range|upper|lower|strip|split|join|contains|str|int|float|abs|round|sorted|reversed|min|max|sum|type_of|keys|values|items|get|replace|starts_with|ends_with|find|zip|parse_json|to_json|map|filter|sort_by|reduce|now|to_iso8601|sha256|md5|base64_encode|base64_decode|random|bytes_from_hex|bytes_to_hex|bytes_from_string|bytes_to_string|pack_uint16|pack_uint32|unpack_uint16|unpack_uint32|checksum|build_ip_header|build_tcp_header|build_udp_header|build_icmp_echo|regex_match|regex_find_all|regex_find|regex_replace)\\b(?=\\s*\\()",
       "name": "support.function.builtin.nyxscript"
     },
     "function-call": {

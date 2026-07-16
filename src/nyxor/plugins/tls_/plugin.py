@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from urllib.parse import urlsplit
 
 import typer
 
 from nyxor.core.context import NyxorContext
 from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import Asset, Finding, ModuleResult, Severity
+from nyxor.core.netparse import split_host_port
 from nyxor.core.output import emit_results
 from nyxor.plugins.http_.inspector import ValidateUrl
 from nyxor.plugins.tls_.inspector import WEAK_PROTOCOLS, inspect
@@ -22,36 +22,7 @@ tls_app = typer.Typer(
 
 
 def _parse_target(target: str) -> tuple[str, int]:
-    # A full URL (nyx audit accepts one, same as http.inspect) — pull the
-    # host/port back out instead of treating "https" as the hostname and
-    # "//example.com/" as the port.
-    if "://" in target:
-        parsed = urlsplit(target)
-        if parsed.hostname:
-            return parsed.hostname, parsed.port or 443
-
-    # Bracketed IPv6 literal, e.g. "[::1]:443" or bare "[::1]" — pull the
-    # address out from between the brackets (unbracketed is what a socket
-    # connection wants) before even looking for a ":port" suffix, so it
-    # doesn't get treated as one big opaque hostname string port and all.
-    if target.startswith("["):
-        closing = target.find("]")
-        if closing != -1:
-            host = target[1:closing]
-            rest = target[closing + 1 :]
-            if rest.startswith(":") and rest[1:].isdigit():
-                return host, int(rest[1:])
-            return host, 443
-
-    # A bare (unbracketed) IPv6 address has multiple colons — only treat a
-    # single colon as a "host:port" separator, so "2606:4700::1" isn't
-    # mangled into host="2606" port(invalid).
-    if target.count(":") == 1:
-        host, _, port_str = target.rpartition(":")
-        if port_str.isdigit():
-            return host, int(port_str)
-
-    return target, 443
+    return split_host_port(target, default_port=443)
 
 
 async def run_inspect(

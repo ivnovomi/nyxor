@@ -31,7 +31,6 @@ PROJECT_CONFIG_FILENAMES = ("nyxor.toml", ".nyxor.toml")
 DEFAULT_CONFIG: dict[str, Any] = {
     "general": {
         "log_level": "INFO",
-        "log_format": "console",  # "console" | "json"
         "output_format": "json",  # "json" | "yaml" | "table"
         "output_dir": "./nyxor-output",
     },
@@ -51,7 +50,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 class GeneralConfig(BaseModel):
     log_level: str = "INFO"
-    log_format: str = "console"
     output_format: str = "json"
     output_dir: str = "./nyxor-output"
 

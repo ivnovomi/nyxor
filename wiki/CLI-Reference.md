@@ -200,11 +200,9 @@ first if anything seems broken; see [FAQ](FAQ-Troubleshooting).
 
 ### `nyx update`
 
-Checks whether a newer version of NYXOR is available.
-
-| Flag | Purpose |
-|---|---|
-| `--check-only` / `--no-check-only` | Default `--check-only` |
+Checks whether a newer version of NYXOR is available. No flags — it never
+installs anything, it only reports the latest version and how to install it
+via `uv`.
 
 ### `nyx auth SUBCOMMAND`
 

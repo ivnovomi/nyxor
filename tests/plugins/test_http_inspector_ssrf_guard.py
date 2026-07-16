@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from nyxor.plugins.http_.inspector import _pin_url_to_ip, inspect
+from tests._http_mocks import FakeStream
 
 
 def test_pin_url_to_ip_fails_fast_on_a_url_with_no_hostname() -> None:
@@ -16,24 +17,11 @@ def test_pin_url_to_ip_fails_fast_on_a_url_with_no_hostname() -> None:
         _pin_url_to_ip("not-a-real-url", "93.184.216.34")
 
 
-class _FakeStream:
-    """Mimics the async context manager ``httpx.AsyncClient.stream()`` returns."""
-
-    def __init__(self, response: httpx.Response) -> None:
-        self._response = response
-
-    async def __aenter__(self) -> httpx.Response:
-        return self._response
-
-    async def __aexit__(self, *exc_info: object) -> None:
-        return None
-
-
 async def test_validate_url_is_checked_on_the_initial_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
-        return _FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
+        return FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
 
     monkeypatch.setattr(httpx.AsyncClient, "stream", fake_stream)
 
@@ -64,8 +52,8 @@ async def test_validate_url_is_checked_on_every_redirect_hop(
         try:
             location = next(hops)
         except StopIteration:
-            return _FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
-        return _FakeStream(
+            return FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
+        return FakeStream(
             httpx.Response(302, headers={"location": location}, request=httpx.Request(method, url))
         )
 
@@ -91,7 +79,7 @@ async def test_a_rejected_redirect_hop_aborts_the_inspection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
-        return _FakeStream(
+        return FakeStream(
             httpx.Response(
                 302,
                 headers={"location": "http://169.254.169.254/latest/meta-data/"},

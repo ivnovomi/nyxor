@@ -41,10 +41,10 @@ class Plugin(Protocol):
     """Interface every plugin's ``PLUGIN`` object must satisfy.
 
     A plugin is discovered via the ``nyxor.plugins`` entry-point group (see
-    docs/plugin-development.md) and is asked to register its Typer commands
-    against the shared app. It receives a :class:`NyxorContext` so it can
-    read configuration, log, and emit events without importing Core
-    internals directly.
+    the "Plugin Development" wiki page) and is asked to register its Typer
+    commands against the shared app. It receives a :class:`NyxorContext` so
+    it can read configuration and log without importing Core internals
+    directly.
     """
 
     metadata: PluginMetadata
