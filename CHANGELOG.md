@@ -2,6 +2,93 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.6.5 — NyxScript protocol builder, regex/hashing, SARIF, a CI gate, and a security hardening pass
+
+### NyxScript: sockets, TLS, and raw packets (all gated behind `--unsafe`)
+- `socket.*`: TCP/UDP connect/send/recv/close, plus byte-level builtins
+  (`bytes_from_hex`/`bytes_to_hex`/`bytes_from_string`/`bytes_to_string`,
+  `pack_uint16`/`pack_uint32`/`unpack_uint16`/`unpack_uint32`) — real
+  network access for protocols NYXOR's audited scan modules don't cover.
+- `socket.connect_tls(host, port[, timeout][, verify])` — a TLS handshake
+  wrapped around `socket.connect`; every other `socket.*` function then
+  works on the returned handle unchanged.
+- Raw IP packet building and sending/sniffing: `checksum()` (RFC 1071),
+  `build_ip_header()`, `build_tcp_header()`, `build_udp_header()`,
+  `build_icmp_echo()`, plus `socket.raw_send`/`raw_recv`/`raw_read`.
+- `lib/ftp.nyx` and `lib/http.nyx` built on top of the new socket layer.
+- A bare `unsafe` statement (typically the first line of a script) lets a
+  script self-enable `python:`/`pip`/`socket.*` for the rest of its own
+  run, without `--unsafe` on the CLI or the TUI's Unsafe toggle — closed a
+  gap where this could self-escalate past `nyx mcp`'s hardcoded
+  `unsafe=False`, which exists specifically so an MCP tool call can never
+  reach arbitrary code execution.
+
+### NyxScript: language and stdlib
+- `regex_match`/`regex_find`/`regex_find_all`/`regex_replace`, backed by a
+  persistent worker *process* with a hard wall-clock timeout (a thread
+  can't reliably interrupt a catastrophic-backtracking match — CPython's
+  `re` never releases the GIL mid-match).
+- `sha256()`/`md5()` builtins (fingerprinting/dedup, not password
+  hashing), `base64` and `random` builtins, raw string literals
+  (`r"..."`/`r'...'`), and a `str(bool)` fix to match `print`'s own
+  `true`/`false` formatting.
+- New stdlib modules: `lib/hash.nyx`, `lib/csv.nyx`, `lib/time.nyx`
+  (`now()`/`to_iso8601()`), `lib/asset.nyx`, `lib/set.nyx` (union/
+  intersect/difference/is_subset/is_disjoint), `lib/net.nyx`
+  (`host_from_target`/`port_from_target`/`is_private_ipv4`),
+  `lib/random.nyx`, `lib/text.nyx`, `lib/table.nyx`, and functional
+  combinators in `lib/lambdas.nyx` (`compose`, `pipe`, `partial`, `flip`,
+  `negate`, `any_of`/`all_of`/`none_of`, `group_by`, `flat_map`, ...).
+- `range()`/sequence-repetition allocation is now capped.
+- The LSP server and the TUI's own editor autocomplete now resolve a
+  script's own `import "lib/x.nyx" as alias` — typing `alias.` suggests
+  that library's real functions instead of nothing.
+
+### CI and distribution
+- `nyx audit --fail-on SEVERITY`: exit 1 if any finding is at least that
+  severity — the missing piece for using `nyx audit` as an actual CI
+  gate. Also exposed on the GitHub Action.
+- SARIF 2.1.0 output (`--output results.sarif`, `nyx report convert --to
+  sarif`, or a NyxScript `save VAR to "x.sarif"`) — findings show up as
+  native GitHub Code Scanning alerts.
+- PyPI publishing via Trusted Publishing (OIDC, no token in the repo) on
+  a `vX.Y.Z` tag push, and a documented GitHub Action that comments the
+  grade on the triggering pull request.
+
+### Security
+- Fixed four issues from a security review: XSS in the badge SVG and the
+  OAuth device-login page (unescaped `label`/`user_code` interpolated
+  into markup), SSRF via a redirect the initial-URL check didn't cover,
+  and NyxScript's `save` statement allowing a path outside the script's
+  working directory with no `--unsafe` required.
+- A follow-up hardening pass across the API, NyxScript interpreter, and
+  scan plugins: the OAuth device-flow approval endpoint now requires a
+  loopback caller *and* a matching `Host` header (closing both a
+  self-approval gap and a DNS-rebinding bypass of the loopback check);
+  bearer tokens expire and are compared via a hashed, O(1) lookup instead
+  of living forever; the SSRF guard now also blocks the CGNAT/Shared
+  Address Space range; the HTTP inspector streams and caps response
+  bodies instead of buffering an attacker-controlled size; and NyxScript's
+  `import` statement got the same working-directory containment `save`
+  already had.
+- Related correctness fixes found in the same pass: a malformed hostname
+  no longer crashes an entire `audit`/`watch`/`trends` run; `nyx audit`
+  no longer crashes when a page redirects (`Finding.evidence` must be a
+  dict); target-controlled text is escaped before reaching Rich markup
+  or Markdown tables (TUI tables, report titles) so brackets in scanned
+  data can't corrupt output or crash the TUI; a missing `ping` binary is
+  now reported as an error instead of silently reading as "0 hosts
+  reachable"; and every local-AI failure mode (not just the three most
+  common) now falls back gracefully instead of propagating raw.
+- Performance: `regex_*` builtins run off the interpreter's event loop
+  thread; DNS record and mail-record lookups run concurrently instead of
+  sequentially; and the TUI script editor caches per-import parses by
+  file mtime instead of re-reading imports from disk on every keystroke.
+
+### Fun
+- `nyx flex` (an RGB glitch-reveal closing on live process stats) and
+  `nyx matrix --rainbow`.
+
 ## 0.6.0 — Lambdas, higher-order functions, slicing, JSON, and better errors
 
 ### NyxScript language
