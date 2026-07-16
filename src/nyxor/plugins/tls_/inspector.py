@@ -17,11 +17,24 @@ from cryptography import x509
 WEAK_PROTOCOLS = {"TLSv1", "TLSv1.1", "SSLv3", "SSLv2"}
 
 
-def inspect(host: str, port: int = 443, timeout: float = 5.0) -> dict[str, Any]:
-    """Connect to ``host:port``, complete a TLS handshake, and describe the certificate."""
+def inspect(
+    host: str, port: int = 443, timeout: float = 5.0, *, pinned_ip: str | None = None
+) -> dict[str, Any]:
+    """Connect to ``host:port``, complete a TLS handshake, and describe the certificate.
+
+    ``pinned_ip``, if given, is what the TCP connection actually dials —
+    ``host`` is still used for the TLS handshake's SNI and certificate
+    hostname verification. A caller that already resolved and validated
+    ``host`` (the REST API's SSRF guard) passes the specific address it
+    checked here so this connection can't re-resolve to something else; a
+    plain ``socket.create_connection((host, port))`` does its own DNS
+    lookup, which is a second, independent resolution a DNS-rebinding
+    attacker (a very short TTL, a public answer for the first lookup and a
+    private one for the second) can exploit to slip past the check.
+    """
     context = ssl.create_default_context()
     with (
-        socket.create_connection((host, port), timeout=timeout) as sock,
+        socket.create_connection((pinned_ip or host, port), timeout=timeout) as sock,
         context.wrap_socket(sock, server_hostname=host) as tls_sock,
     ):
         der_cert = tls_sock.getpeercert(binary_form=True)

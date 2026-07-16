@@ -5,12 +5,17 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from typing import Any
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 
 from nyxor.plugins.http_.fingerprint import fingerprint
 
-ValidateUrl = Callable[[str], Awaitable[None]]
+# Returns the IP address the caller has already validated and wants the
+# connection pinned to (closing a DNS-rebinding TOCTOU — see `inspect()`),
+# or None if there's nothing to pin (the target was already a literal IP,
+# or the caller doesn't need pinning at all, e.g. the CLI).
+ValidateUrl = Callable[[str], Awaitable[str | None]]
 
 # Header/security-header checks and tech fingerprinting need at most a few KB
 # of body (meta tags, generator strings, ...) — capping how much of the
@@ -61,6 +66,23 @@ async def _read_capped_body(response: httpx.Response) -> bytes:
     return b"".join(chunks)
 
 
+def _pin_url_to_ip(url: str, ip: str) -> tuple[str, str]:
+    """Rewrite ``url`` to connect to ``ip`` instead of letting the HTTP
+
+    client resolve its own hostname, returning ``(pinned_url, host_header)``.
+    The caller must send ``host_header`` as both the ``Host`` header and the
+    TLS SNI hostname, or the server won't recognize the request (virtual
+    hosting) and/or the certificate won't validate against a bare IP.
+    """
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    host_header = host if parsed.port is None else f"{host}:{parsed.port}"
+    ip_literal = f"[{ip}]" if ":" in ip else ip
+    netloc = ip_literal if parsed.port is None else f"{ip_literal}:{parsed.port}"
+    pinned_url = urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+    return pinned_url, host_header
+
+
 async def inspect(
     url: str,
     timeout: float,
@@ -75,6 +97,14 @@ async def inspect(
     precisely so each one can be checked, not just the URL the caller
     passed in. Callers that don't need that (the CLI, which is meant to be
     able to point at internal/private targets on purpose) simply omit it.
+
+    When ``validate_url`` returns a pinned IP, the actual connection is made
+    to that exact address instead of letting the HTTP client re-resolve the
+    hostname itself — otherwise the validation above and the connection that
+    follows are two independent DNS lookups, and a DNS-rebinding attacker
+    (a very short TTL, a public answer for the first lookup and a private
+    one for the second) can pass the check and still reach an internal
+    address.
     """
     redirect_chain: list[dict[str, Any]] = []
 
@@ -85,9 +115,19 @@ async def inspect(
         response: httpx.Response
         body = b""
         for _ in range(max_redirects + 1):
-            if validate_url is not None:
-                await validate_url(current_url)
-            async with client.stream("GET", current_url) as response:
+            pinned_ip = await validate_url(current_url) if validate_url is not None else None
+
+            request_url = current_url
+            request_headers: dict[str, str] = {}
+            extensions: dict[str, Any] = {}
+            if pinned_ip is not None:
+                request_url, host_header = _pin_url_to_ip(current_url, pinned_ip)
+                request_headers["Host"] = host_header
+                extensions["sni_hostname"] = urlsplit(current_url).hostname
+
+            async with client.stream(
+                "GET", request_url, headers=request_headers, extensions=extensions
+            ) as response:
                 if follow_redirects and response.is_redirect:
                     location = response.headers.get("location", "")
                     redirect_chain.append(
@@ -97,9 +137,10 @@ async def inspect(
                             "location": location,
                         }
                     )
-                    current_url = (
-                        str(response.next_request.url) if response.next_request else location
-                    )
+                    # Resolve against the logical (hostname-based) current_url,
+                    # not the pinned request_url actually sent — otherwise a
+                    # relative Location would resolve against a bare IP.
+                    current_url = urljoin(current_url, location) if location else current_url
                     continue
                 body = await _read_capped_body(response)
             break
@@ -120,7 +161,11 @@ async def inspect(
     fingerprint_result = fingerprint(headers, cookies, text)
 
     return {
-        "final_url": str(response.url),
+        # current_url is the logical (hostname-based) URL, even when the
+        # actual connection was pinned to a specific IP — reporting the raw
+        # IP here would be both a behavior regression and a leak of an
+        # implementation detail that means nothing to whoever reads the report.
+        "final_url": current_url,
         "status_code": response.status_code,
         "headers": headers,
         "redirect_chain": redirect_chain,

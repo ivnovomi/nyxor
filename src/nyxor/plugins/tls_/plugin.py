@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
 import typer
@@ -12,6 +13,11 @@ from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import Asset, Finding, ModuleResult, Severity
 from nyxor.core.output import emit_results
 from nyxor.plugins.tls_.inspector import WEAK_PROTOCOLS, inspect
+
+# See nyxor.plugins.http_.inspector.ValidateUrl for the same contract:
+# validate (and, for the REST API's SSRF guard, resolve/pin) a target
+# before it's actually connected to.
+ValidateHost = Callable[[str], Awaitable[str | None]]
 
 tls_app = typer.Typer(
     name="tls",
@@ -53,13 +59,23 @@ def _parse_target(target: str) -> tuple[str, int]:
     return target, 443
 
 
-async def run_inspect(target: str, timeout: float) -> ModuleResult:
-    """Inspect the TLS certificate and negotiated connection for HOST[:PORT]."""
+async def run_inspect(
+    target: str, timeout: float, *, validate_url: ValidateHost | None = None
+) -> ModuleResult:
+    """Inspect the TLS certificate and negotiated connection for HOST[:PORT].
+
+    ``validate_url``, if given, is awaited on ``host`` first — used by the
+    REST API to enforce its SSRF guard and to pin the connection to the
+    exact address it validated (see
+    :func:`nyxor.plugins.tls_.inspector.inspect`). The CLI/TUI/NyxScript,
+    meant to be able to target internal hosts on purpose, simply omit it.
+    """
     host, port = _parse_target(target)
     result = ModuleResult(module="tls.inspect", target=f"{host}:{port}")
 
     try:
-        info = await asyncio.to_thread(inspect, host, port, timeout)
+        pinned_ip = await validate_url(host) if validate_url is not None else None
+        info = await asyncio.to_thread(inspect, host, port, timeout, pinned_ip=pinned_ip)
     except Exception as exc:
         result.errors.append(str(exc))
         return result

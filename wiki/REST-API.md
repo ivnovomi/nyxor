@@ -60,6 +60,15 @@ hop**, not just the URL you typed. A public redirector that bounces to
 redirect surfaces as an error on that module's result rather than a hard
 500 — the request still returns `200`, just with `"errors": [...]` set.
 
+Validating a hostname and then letting the HTTP/TLS client resolve it
+*again* to actually connect would leave a DNS-rebinding gap: a
+short-TTL nameserver can answer the validation lookup with a public
+address and the connection's own, independent lookup moments later with
+a private one. `_ensure_public_target` closes this by returning the
+specific IP it validated, and the HTTP/TLS connections that follow are
+**pinned** to that exact address (via a `Host`/SNI override for HTTP, a
+direct-IP-dial for TLS) instead of re-resolving the hostname themselves.
+
 ```bash
 curl http://127.0.0.1:8842/dns/127.0.0.1
 # 400: refusing to scan '127.0.0.1': resolves to a non-public address (127.0.0.1)

@@ -55,12 +55,14 @@ async def run_audit(
 ) -> list[ModuleResult]:
     """Run DNS, TLS, and HTTP checks against ``domain`` concurrently.
 
-    ``validate_url``, if given, gates the HTTP check's initial request and
-    every redirect hop — see :func:`nyxor.plugins.http_.plugin.run_inspect`.
+    ``validate_url``, if given, gates (and pins) the HTTP check's initial
+    request and every redirect hop, plus the TLS check's connection — see
+    :func:`nyxor.plugins.http_.plugin.run_inspect` and
+    :func:`nyxor.plugins.tls_.plugin.run_inspect`.
     """
     dns_result, tls_result, http_result = await asyncio.gather(
         dns_run_lookup(_hostname_for_dns(domain), config.dns.resolvers, config.dns.timeout_seconds),
-        tls_run_inspect(domain, config.tls.timeout_seconds),
+        tls_run_inspect(domain, config.tls.timeout_seconds, validate_url=validate_url),
         http_run_inspect(domain, config.http, validate_url=validate_url),
     )
     return [dns_result, tls_result, http_result]
