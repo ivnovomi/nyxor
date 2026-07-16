@@ -2,6 +2,22 @@
 
 All notable changes to NYXOR are documented here.
 
+## 0.6.6 — Close a DNS-rebinding gap in the REST API's SSRF guard
+
+- The SSRF guard (`_ensure_public_target`) validated a hostname's
+  resolved IP once, then let the HTTP/TLS client re-resolve the same
+  hostname independently to actually connect — a DNS-rebinding attacker
+  (a very short TTL, a public answer for the validation lookup and a
+  private one for the connection lookup) could pass the check and still
+  reach an internal address.
+- Fixed: the guard now returns the specific IP it validated, and the
+  HTTP/TLS connections that follow are **pinned** to that exact address
+  instead of re-resolving — a `Host`/SNI override for HTTP, a
+  direct-IP dial for TLS.
+- `/tls/{target}` (and `/audit`'s TLS leg) previously had no per-request
+  validation at all beyond the one up-front check on the raw target
+  string; this closes that gap too.
+
 ## 0.6.5 — NyxScript protocol builder, regex/hashing, SARIF, a CI gate, and a security hardening pass
 
 ### NyxScript: sockets, TLS, and raw packets (all gated behind `--unsafe`)
