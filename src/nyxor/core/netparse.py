@@ -18,8 +18,13 @@ def split_host_port(target: str, default_port: int) -> tuple[str, int]:
     IPv6 literal (``[::1]:443`` or bare ``[::1]``), ``host:port``, or a bare
     host/IP. Falls back to ``(target, default_port)`` when nothing else
     matches, including a bare IPv6 address (which has more than one colon
-    and is therefore never mistaken for a ``host:port`` pair).
+    and is therefore never mistaken for a ``host:port`` pair). Leading/
+    trailing whitespace is stripped first, so a value copy-pasted with a
+    stray space or newline (common from CLI args, config files) doesn't
+    get treated as part of the hostname.
     """
+    target = target.strip()
+
     if "://" in target:
         parsed = urlsplit(target)
         if parsed.hostname:
