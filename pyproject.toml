@@ -63,6 +63,16 @@ api = [
 mcp = [
     "mcp>=1.0.0",
 ]
+# `nyx http inspect --screenshot` (gated behind --unsafe — see
+# plugins/http_/screenshot.py). Both are heavy (a real browser engine, a
+# terminal-graphics library) and only needed by that one opt-in flag, so
+# they stay out of the core install.
+screenshot = [
+    "playwright>=1.48.0",
+    # Auto-detects Kitty/Sixel/half-cell/plain-unicode at render time and
+    # falls back gracefully — no per-terminal capability code of our own.
+    "textual-image>=0.7.0",
+]
 
 [project.scripts]
 nyxor = "nyxor.core.cli:main"

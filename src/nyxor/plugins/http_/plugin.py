@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import typer
 
 from nyxor.core.config import HttpConfig
 from nyxor.core.context import NyxorContext
+from nyxor.core.errors import NyxorError
 from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import Finding, ModuleResult, Severity
 from nyxor.core.output import emit_results
 from nyxor.plugins.http_.inspector import ValidateUrl, inspect
+from nyxor.plugins.http_.screenshot import ScreenshotError, capture_screenshot
 
 http_app = typer.Typer(
     name="http",
@@ -148,12 +151,66 @@ async def run_inspect(
     return result
 
 
+async def _screenshot_and_preview(context: NyxorContext, url: str, output_path: Path) -> None:
+    await capture_screenshot(url, output_path)
+    context.console.print(f"[green]Screenshot saved:[/green] {output_path}")
+
+    if not context.console.is_terminal:
+        return
+    try:
+        # See screenshot.py's module docstring: 'screenshot' is a
+        # deliberately optional, CI-excluded extra.
+        from textual_image.renderable import Image  # type: ignore[import-not-found]
+    except ImportError as exc:
+        raise NyxorError(
+            "Screenshots need the 'screenshot' extra.",
+            hint="Install it with: uv sync --extra screenshot",
+        ) from exc
+    context.console.print(Image(output_path, width="auto"))
+
+
 @http_app.command("inspect")
-def http_inspect(ctx: typer.Context, url: str) -> None:
+def http_inspect(
+    ctx: typer.Context,
+    url: str,
+    screenshot: Path | None = typer.Option(
+        None,
+        "--screenshot",
+        help="Save a full-page PNG screenshot to this path (requires --unsafe).",
+    ),
+    unsafe: bool = typer.Option(
+        False,
+        "--unsafe",
+        help="Allow --screenshot to render the page in a real headless browser.",
+    ),
+) -> None:
     """Inspect the HTTP response for a URL."""
     context: NyxorContext = ctx.obj
     result = asyncio.run(run_inspect(url, context.config.http))
     emit_results(context, [result], title="NYXOR HTTP Report")
+
+    if screenshot is not None:
+        if not unsafe:
+            context.console.print(
+                "[red]--screenshot requires --unsafe.[/red] Unlike the rest of this "
+                "command, a screenshot renders the page in a real browser — it executes "
+                "the page's own JavaScript and loads whatever it references, not just "
+                "the bounded request this command otherwise makes."
+            )
+            raise typer.Exit(code=1)
+        # raw_data is only empty when run_inspect() itself already failed (e.g. a
+        # connection error) — in that case there's no resolved final_url to fall
+        # back on, so normalize the scheme the same way run_inspect() does and let
+        # the screenshot attempt fail on its own terms instead of silently skipping.
+        target_url = (result.raw_data or {}).get("final_url", url)
+        if not target_url.startswith(("http://", "https://")):
+            target_url = f"https://{target_url}"
+        try:
+            asyncio.run(_screenshot_and_preview(context, target_url, screenshot))
+        except ScreenshotError as exc:
+            context.console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from None
+
     if not result.ok:
         raise typer.Exit(code=1)
 

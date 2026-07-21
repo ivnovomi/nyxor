@@ -576,9 +576,10 @@ uv run nyx --help
 ```
 
 Other optional extras: `--extra lsp` (language server), `--extra api`
-(REST API), `--extra mcp` (MCP server). This installs an editable
-checkout, so `nyx` / `nyxor` on your `uv run` PATH reflect local source
-changes immediately.
+(REST API), `--extra mcp` (MCP server), `--extra screenshot` (`nyx http
+inspect --screenshot`, a headless-browser dependency kept out of the
+core install). This installs an editable checkout, so `nyx` / `nyxor`
+on your `uv run` PATH reflect local source changes immediately.
 
 ## Global options
 
