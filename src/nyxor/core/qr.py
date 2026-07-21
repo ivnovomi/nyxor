@@ -19,8 +19,18 @@ import qrcode
 
 
 def render_qr(data: str, *, border: int = 1) -> str:
-    """Render ``data`` as a QR code, one line per output row."""
-    qr = qrcode.QRCode(border=border)
+    """Render ``data`` as a QR code, one line per output row.
+
+    ``error_correction`` is pinned (rather than left to whatever the
+    installed ``qrcode`` version currently defaults to) so the module
+    layout for the same input can't shift under us across a dependency
+    bump. ``version`` is intentionally left on auto-fit — that's the
+    correct behavior (grow to whatever the data needs), not something to
+    pin. ``box_size``/output-image options don't apply here at all: this
+    only ever reads the QR matrix, never renders through qrcode's own
+    (Pillow-based) image output.
+    """
+    qr = qrcode.QRCode(border=border, error_correction=qrcode.constants.ERROR_CORRECT_M)
     qr.add_data(data)
     qr.make(fit=True)
     matrix: list[list[bool]] = qr.get_matrix()
