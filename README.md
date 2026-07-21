@@ -581,6 +581,14 @@ inspect --screenshot`, a headless-browser dependency kept out of the
 core install). This installs an editable checkout, so `nyx` / `nyxor`
 on your `uv run` PATH reflect local source changes immediately.
 
+`--extra screenshot` installs Playwright's Python bindings only — the
+browser itself is a separate, one-time download:
+
+```bash
+uv sync --extra dev --extra screenshot
+uv run playwright install chromium
+```
+
 ## Global options
 
 Every command accepts:

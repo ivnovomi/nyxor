@@ -13,7 +13,17 @@ from nyxor.core.context import NyxorContext
 from nyxor.core.errors import NyxorError
 from nyxor.core.models import ModuleResult
 from nyxor.plugins.http_ import plugin as http_plugin
-from nyxor.plugins.http_.screenshot import _host_resolver_rule, capture_screenshot
+from nyxor.plugins.http_.screenshot import (
+    _host_resolver_rule,
+    capture_screenshot,
+    missing_screenshot_extra,
+)
+
+
+def test_missing_screenshot_extra_names_the_extra_and_the_install_command() -> None:
+    err = missing_screenshot_extra(ImportError("no module named playwright"))
+    assert "'screenshot' extra" in err.message
+    assert err.hint == "Install it with: uv sync --extra screenshot"
 
 
 def test_host_resolver_rule_maps_the_hostname_to_the_pinned_ip() -> None:

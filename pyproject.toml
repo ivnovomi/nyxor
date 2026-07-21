@@ -66,7 +66,9 @@ mcp = [
 # `nyx http inspect --screenshot` (gated behind --unsafe — see
 # plugins/http_/screenshot.py). Both are heavy (a real browser engine, a
 # terminal-graphics library) and only needed by that one opt-in flag, so
-# they stay out of the core install.
+# they stay out of the core install. This only installs playwright's
+# Python bindings, not a browser — that's a separate, one-time
+# `uv run playwright install chromium` (see README.md).
 screenshot = [
     "playwright>=1.48.0",
     # Auto-detects Kitty/Sixel/half-cell/plain-unicode at render time and

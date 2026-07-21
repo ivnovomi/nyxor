@@ -33,6 +33,19 @@ class ScreenshotError(Exception):
     """Raised when a screenshot could not be captured."""
 
 
+def missing_screenshot_extra(exc: ImportError) -> NyxorError:
+    """Build the "install the extra" error for an ``ImportError`` raised by
+
+    a lazy ``playwright``/``textual_image`` import — both this module and
+    the CLI's terminal-preview step (``plugins/http_/plugin.py``) hit the
+    same missing-dependency case and should report it identically.
+    """
+    return NyxorError(
+        "Screenshots need the 'screenshot' extra.",
+        hint="Install it with: uv sync --extra screenshot",
+    )
+
+
 def _host_resolver_rule(url: str, pinned_ip: str) -> str | None:
     """Build a Chromium ``--host-resolver-rules`` launch arg pinning ``url``'s
 
@@ -63,10 +76,7 @@ async def capture_screenshot(
         from playwright.async_api import Error as PlaywrightError  # type: ignore[import-not-found]
         from playwright.async_api import async_playwright
     except ImportError as exc:
-        raise NyxorError(
-            "Screenshots need the 'screenshot' extra.",
-            hint="Install it with: uv sync --extra screenshot",
-        ) from exc
+        raise missing_screenshot_extra(exc) from exc
 
     launch_args = []
     if pinned_ip is not None:
@@ -74,9 +84,8 @@ async def capture_screenshot(
         if rule is not None:
             launch_args.append(rule)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
     try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         async with async_playwright() as playwright:
             browser = await playwright.chromium.launch(args=launch_args)
             try:
@@ -85,5 +94,5 @@ async def capture_screenshot(
                 await page.screenshot(path=str(output_path), full_page=True)
             finally:
                 await browser.close()
-    except PlaywrightError as exc:
+    except (PlaywrightError, OSError) as exc:
         raise ScreenshotError(f"Could not capture a screenshot of {url}: {exc}") from exc

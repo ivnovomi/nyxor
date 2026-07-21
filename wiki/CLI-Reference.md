@@ -65,8 +65,9 @@ passive tech-stack/CDN/WAF fingerprinting.
 | `--unsafe` | Allow `--screenshot` to render the page in a real headless browser |
 
 `--screenshot` needs the `screenshot` extra (`uv sync --extra
-screenshot`) — a real browser engine (Playwright/Chromium), not
-installed by default. It's gated behind `--unsafe` because, unlike the
+screenshot`, then a one-time `uv run playwright install chromium` to
+fetch the browser itself — the extra only installs Playwright's Python
+bindings). It's gated behind `--unsafe` because, unlike the
 rest of this command, rendering a page executes its own JavaScript and
 loads whatever it references — not a bounded, passive request like
 everything else NYXOR does. When run in a terminal, also prints an

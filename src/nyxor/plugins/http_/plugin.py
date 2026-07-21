@@ -9,12 +9,15 @@ import typer
 
 from nyxor.core.config import HttpConfig
 from nyxor.core.context import NyxorContext
-from nyxor.core.errors import NyxorError
 from nyxor.core.interfaces import PluginMetadata
 from nyxor.core.models import Finding, ModuleResult, Severity
 from nyxor.core.output import emit_results
 from nyxor.plugins.http_.inspector import ValidateUrl, inspect
-from nyxor.plugins.http_.screenshot import ScreenshotError, capture_screenshot
+from nyxor.plugins.http_.screenshot import (
+    ScreenshotError,
+    capture_screenshot,
+    missing_screenshot_extra,
+)
 
 http_app = typer.Typer(
     name="http",
@@ -162,10 +165,7 @@ async def _screenshot_and_preview(context: NyxorContext, url: str, output_path: 
         # deliberately optional, CI-excluded extra.
         from textual_image.renderable import Image  # type: ignore[import-not-found]
     except ImportError as exc:
-        raise NyxorError(
-            "Screenshots need the 'screenshot' extra.",
-            hint="Install it with: uv sync --extra screenshot",
-        ) from exc
+        raise missing_screenshot_extra(exc) from exc
     context.console.print(Image(output_path, width="auto"))
 
 
