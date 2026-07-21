@@ -140,12 +140,12 @@ def test_http_endpoint_rejects_a_redirect_to_a_metadata_ip(nyxor_test_client, mo
     def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
         """
         Simulate HTTP responses for redirect and metadata-IP requests.
-        
+
         Parameters:
             method: HTTP method used for the request.
             url: Requested URL.
             **kwargs: Additional request arguments.
-        
+
         Returns:
             A ``FakeStream`` containing a successful response for metadata-IP URLs or
             a redirect response to the metadata service for other URLs.
