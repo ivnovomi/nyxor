@@ -211,7 +211,7 @@ For authenticating against a `nyx serve` instance's OAuth2-protected
 
 | Subcommand | Purpose | Flags |
 |---|---|---|
-| `login` | Log in via OAuth2 device flow (default), or save a token directly | `--host TEXT` (default `http://127.0.0.1:8842`), `--token TEXT` (skip the flow, save a token you already have) |
+| `login` | Log in via OAuth2 device flow (default), or save a token directly. In a terminal, also prints a QR code (rendered as text — no image protocol needed) that scans straight to the approval page | `--host TEXT` (default `http://127.0.0.1:8842`), `--token TEXT` (skip the flow, save a token you already have) |
 | `approve USER_CODE` | Approve a device login headlessly, no browser needed | `--host TEXT` |
 | `logout` | Delete the locally-saved API token | — |
 | `whoami` | Show whether a token is saved, and where | — |
