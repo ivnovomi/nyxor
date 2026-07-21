@@ -138,6 +138,18 @@ def test_http_endpoint_rejects_a_redirect_to_a_metadata_ip(nyxor_test_client, mo
     import httpx2 as httpx
 
     def fake_stream(self, method, url, **kwargs):  # noqa: ANN001
+        """
+        Simulate HTTP responses for redirect and metadata-IP requests.
+
+        Parameters:
+            method: HTTP method used for the request.
+            url: Requested URL.
+            **kwargs: Additional request arguments.
+
+        Returns:
+            A ``FakeStream`` containing a successful response for metadata-IP URLs or
+            a redirect response to the metadata service for other URLs.
+        """
         if "169.254.169.254" in str(url):
             return FakeStream(httpx.Response(200, request=httpx.Request(method, url)))
         return FakeStream(

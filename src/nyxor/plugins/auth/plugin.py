@@ -18,6 +18,7 @@ import typer
 
 from nyxor.core.context import NyxorContext
 from nyxor.core.interfaces import PluginMetadata
+from nyxor.core.qr import render_qr
 from nyxor.plugins.auth.store import AuthStore, looks_like_a_token, mask_token
 
 auth_app = typer.Typer(
@@ -73,6 +74,21 @@ def login(
 
     context.console.print(f"[bold]Go to:[/bold] {device['verification_uri']}")
     context.console.print(f"[bold]Enter code:[/bold] {device['user_code']}")
+
+    verification_uri_complete = device.get("verification_uri_complete")
+    # Piping/redirecting this output (a log file, a CI job) would otherwise
+    # fill it with unreadable block glyphs meant to be read by a camera,
+    # not a human or a parser.
+    if verification_uri_complete and context.console.is_terminal:
+        context.console.print("\n[dim]Or scan with a phone:[/dim]\n")
+        # markup/highlight off and soft_wrap on: this is a fixed grid of
+        # block glyphs, not prose — Rich re-wrapping or re-coloring a line
+        # would misalign it and make it unscannable.
+        context.console.print(
+            render_qr(verification_uri_complete), markup=False, highlight=False, soft_wrap=True
+        )
+        context.console.print()
+
     context.console.print(
         f"[dim]No browser handy? From another terminal: "
         f"nyx auth approve {device['user_code']} --host {host}[/dim]"
