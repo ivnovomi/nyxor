@@ -57,7 +57,24 @@ Certificate inspection, expiry, protocol/cipher overview for
 ### `nyx http inspect URL`
 
 Response headers, redirects, cookies, compression, security headers,
-passive tech-stack/CDN/WAF fingerprinting. No extra flags.
+passive tech-stack/CDN/WAF fingerprinting.
+
+| Flag | Purpose |
+|---|---|
+| `--screenshot PATH` | Save a full-page PNG screenshot (requires `--unsafe`) |
+| `--unsafe` | Allow `--screenshot` to render the page in a real headless browser |
+
+`--screenshot` needs the `screenshot` extra (`uv sync --extra
+screenshot`, then a one-time `uv run playwright install chromium` to
+fetch the browser itself — the extra only installs Playwright's Python
+bindings). It's gated behind `--unsafe` because, unlike the
+rest of this command, rendering a page executes its own JavaScript and
+loads whatever it references — not a bounded, passive request like
+everything else NYXOR does. When run in a terminal, also prints an
+inline preview of the screenshot (Kitty/Sixel graphics protocol if the
+terminal supports it, falling back to plain text — no protocol
+detection code of our own, and no dependency on what pwsh/Windows
+Terminal happens to support).
 
 ### `nyx network discover TARGET`
 
